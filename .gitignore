@@ -34,7 +34,6 @@ venv.bak/
 .vscode/
 
 # Ignored directories
-downloads/
+chinese_fonts/
+chinese_fonts_finished/
 data/
-test/
-ckpt/

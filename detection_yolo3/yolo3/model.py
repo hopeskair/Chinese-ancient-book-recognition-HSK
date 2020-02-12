@@ -31,10 +31,13 @@ def DarknetConv2D_BN_Leaky(*args, **kwargs):
         BatchNormalization(),
         LeakyReLU(alpha=0.1))
 
+
 def resblock_body(x, num_filters, num_blocks):
-    '''A series of resblocks starting with a downsampling Convolution2D'''
+    """A series of resblocks starting with a downsampling Convolution2D"""
+
     # Darknet uses left and top padding instead of 'same' mode
-    x = ZeroPadding2D(((1,0),(1,0)))(x)
+    x = tf.keras.layers.ZeroPadding2D(((1,0),(1,0)))(x)
+
     x = DarknetConv2D_BN_Leaky(num_filters, (3,3), strides=(2,2))(x)
     for i in range(num_blocks):
         y = compose(
@@ -42,6 +45,7 @@ def resblock_body(x, num_filters, num_blocks):
                 DarknetConv2D_BN_Leaky(num_filters, (3,3)))(x)
         x = Add()([x,y])
     return x
+
 
 def darknet_body(x):
     '''Darknent body having 52 Convolution2D layers'''
