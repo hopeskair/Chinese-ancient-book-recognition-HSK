@@ -19,12 +19,27 @@ CHECKPOINT_DIR = os.path.join(CURR_DIR, "_ckpt")
 
 # ************************ generate image data ***************************
 DATA_DIR = os.path.join(CURR_DIR, "data")
-CHAR_IMGS_DIR = os.path.join(DATA_DIR, "char_images")
-TEXT_LINE_IMGS_DIR = os.path.join(DATA_DIR, "text_line_images")
-BOOK_PAGE_IMGS_DIR = os.path.join(DATA_DIR, "book_page_images")
+
+CHAR_IMGS_DIR = os.path.join(DATA_DIR, "chars", "imgs")
+CHAR_TFRECORDS_DIR = os.path.join(DATA_DIR, "chars", "tfrecords")
+
+TEXT_LINE_IMGS_H = os.path.join(DATA_DIR, "text_lines", "imgs_horizontal")
+TEXT_LINE_IMGS_V = os.path.join(DATA_DIR, "text_lines", "imgs_vertical")
+TEXT_LINE_TAGS_FILE_H = os.path.join(DATA_DIR, "text_lines", "text_lines_tags_horizontal.txt")
+TEXT_LINE_TAGS_FILE_V = os.path.join(DATA_DIR, "text_lines", "text_lines_tags_vertical.txt")
+TEXT_LINE_TFRECORDS_H = os.path.join(DATA_DIR, "text_lines", "tfrecords_horizontal")
+TEXT_LINE_TFRECORDS_V = os.path.join(DATA_DIR, "text_lines", "tfrecords_vertical")
+
+BOOK_PAGE_IMGS_H = os.path.join(DATA_DIR, "book_pages", "imgs_horizontal")
+BOOK_PAGE_IMGS_V = os.path.join(DATA_DIR, "book_pages", "imgs_vertical")
+BOOK_PAGE_TAGS_FILE_H = os.path.join(DATA_DIR, "book_pages", "book_pages_tags_horizontal.txt")
+BOOK_PAGE_TAGS_FILE_V = os.path.join(DATA_DIR, "book_pages", "book_pages_tags_vertical.txt")
+BOOK_PAGE_TFRECORDS_H = os.path.join(DATA_DIR, "book_pages", "tfrecords_horizontal")
+BOOK_PAGE_TFRECORDS_V = os.path.join(DATA_DIR, "book_pages", "tfrecords_vertical")
 
 FONT_FILE_DIR = os.path.join(CURR_DIR, "chinese_fonts")
 FONT_FINISHED_DIR = os.path.join(CURR_DIR, "chinese_fonts_finished")
+
 # EXTERNEL_IMAGES_DIR = os.path.join(CURR_DIR, "../ziku_images")
 EXTERNEL_IMAGES_DIR = "E:/pycharm_project/ziku_images"
 

@@ -40,7 +40,7 @@ def ignorable_chars():
     return "".join(chars)
 
 
-def important_labels():
+def important_chars():
     chars = set()
     with open(IMPORTANT_CHARS_FILE, "r", encoding="utf-8") as fr:
         for line in fr:
@@ -51,7 +51,7 @@ def important_labels():
 
 ID2CHAR_DICT, CHAR2ID_DICT, NUM_LABELS = chinese_labels_dict()
 IGNORABLE_CHARS = ignorable_chars()
-IMPORTANT_CHARS = important_labels()
+IMPORTANT_CHARS = important_chars()
 
 
 def check_or_makedirs(dir_name):

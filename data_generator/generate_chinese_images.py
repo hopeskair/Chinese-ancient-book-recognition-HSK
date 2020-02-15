@@ -10,21 +10,13 @@ import numpy as np
 import tensorflow as tf
 
 from utils import CHAR2ID_DICT
-from utils import IGNORABLE_CHARS
 from config import CHAR_IMG_SIZE, NUM_IMAGES_PER_FONT
-from config import CHAR_IMGS_DIR, FONT_FILE_DIR, FONT_FINISHED_DIR
-from config import EXTERNEL_IMAGES_DIR
+from config import FONT_FILE_DIR, FONT_FINISHED_DIR, EXTERNEL_IMAGES_DIR
+from config import CHAR_IMGS_DIR, CHAR_TFRECORDS_DIR
 
 from utils import check_or_makedirs, remove_then_makedirs
 from data_generator.img_utils import get_standard_image, get_augmented_image
 from data_generator.img_utils import generate_bigger_image_by_font, load_external_image_bigger
-
-
-TRAIN_SET_DIR = os.path.join(CHAR_IMGS_DIR, "train_set")
-TEST_SET_DIR = os.path.join(CHAR_IMGS_DIR, "test_set")
-TFRECORDS_TRAIN_SET = os.path.join(CHAR_IMGS_DIR, "tfrecords_train_set")
-TFRECORDS_TEST_SET = os.path.join(CHAR_IMGS_DIR, "tfrecords_test_set")
-SAMPLES_DIR = os.path.join(CHAR_IMGS_DIR, "_samples")
 
 
 """ ************************ 矢量字体生成训练图片 *************************** """
@@ -35,9 +27,6 @@ def generate_all_chinese_images_bigger(font_file, image_size=int(CHAR_IMG_SIZE*1
     # all_chinese_list = ["无", "爲", "一", "万"]
 
     for chinese_char in all_chinese_list:
-        if chinese_char in IGNORABLE_CHARS:
-            continue
-
         try:  # 生成字体图片
             bigger_PIL_img = generate_bigger_image_by_font(chinese_char, font_file, image_size)
         except OSError:
@@ -62,7 +51,7 @@ def generate_chinese_images_to_check(obj_size=CHAR_IMG_SIZE, augmentation=False)
         font_type = font_name.split(".")[0]
         
         # 创建保存该字体图片的目录
-        font_img_dir = os.path.join(SAMPLES_DIR, font_type)
+        font_img_dir = os.path.join(CHAR_IMGS_DIR, font_type)
         remove_then_makedirs(font_img_dir)
 
         for chinese_char, bigger_PIL_img in generate_all_chinese_images_bigger(font_file, image_size=int(obj_size*1.2)):
@@ -90,7 +79,7 @@ def generate_chinese_images_to_check(obj_size=CHAR_IMG_SIZE, augmentation=False)
     return
 
 
-def generate_chinese_images_to_train(obj_size=CHAR_IMG_SIZE, num_imgs_per_font=NUM_IMAGES_PER_FONT):
+def generate_chinese_images(obj_size=CHAR_IMG_SIZE, num_imgs_per_font=NUM_IMAGES_PER_FONT):
     print("Get font_file_list ...")
     font_file_list = [os.path.join(FONT_FILE_DIR, font_name) for font_name in os.listdir(FONT_FILE_DIR)]
     check_or_makedirs(FONT_FINISHED_DIR)
@@ -104,10 +93,8 @@ def generate_chinese_images_to_train(obj_size=CHAR_IMG_SIZE, num_imgs_per_font=N
         font_type = font_name.split(".")[0]
 
         # 创建保存该字体图片的目录
-        train_dir = os.path.join(TRAIN_SET_DIR, font_type)
-        test_dir = os.path.join(TEST_SET_DIR, font_type)
-        remove_then_makedirs(train_dir)
-        remove_then_makedirs(test_dir)
+        save_dir = os.path.join(CHAR_IMGS_DIR, font_type)
+        remove_then_makedirs(save_dir)
 
         for chinese_char, bigger_PIL_img in generate_all_chinese_images_bigger(font_file, image_size=int(obj_size*1.2)):  # 内层循环是字
             # 检查生成的灰度图像是否可用，黑底白字
@@ -121,8 +108,6 @@ def generate_chinese_images_to_train(obj_size=CHAR_IMG_SIZE, num_imgs_per_font=N
             
             # 保存生成的字体图片
             for index, PIL_img in enumerate(PIL_img_list):
-                # 让train_set和test_set的比例约为 4:1
-                save_dir = train_dir if random.random() < 0.85 else test_dir
                 image_name = chinese_char + "_" + str(index) + ".jpg"
                 save_path = os.path.join(save_dir, image_name)
                 PIL_img.save(save_path, format="jpeg")
@@ -136,26 +121,22 @@ def generate_chinese_images_to_train(obj_size=CHAR_IMG_SIZE, num_imgs_per_font=N
     return
 
 
-def generate_tfrecords_to_train(obj_size=CHAR_IMG_SIZE, num_imgs_per_font=NUM_IMAGES_PER_FONT):
+def generate_tfrecords(obj_size=CHAR_IMG_SIZE, num_imgs_per_font=NUM_IMAGES_PER_FONT):
     print("Get font_file_list ...")
     font_file_list = [os.path.join(FONT_FILE_DIR, font_name) for font_name in os.listdir(FONT_FILE_DIR)]
     font_files_num = len(font_file_list)
     check_or_makedirs(FONT_FINISHED_DIR)
 
     # 创建保存tfrecords文件的目录
-    check_or_makedirs(TFRECORDS_TRAIN_SET)
-    check_or_makedirs(TFRECORDS_TEST_SET)
+    check_or_makedirs(CHAR_TFRECORDS_DIR)
 
     # 可以把生成的图片直接存入tfrecords文件
     # 不必将生成的图片先保存到磁盘，再从磁盘读取出来保存到tfrecords文件，这样效率太低
     # 通常是用某种字体对一个字生成很多个增强的图片，这些图片最好是分开存放
     # 若直接把同一字体同一个字的多张图片连续放到同一个tfrecords里，那么训练batch的多样性不好
-    # 这里的设置是有多少种字体就生成多少个tfreords文件
     writers_list = \
-        [tf.io.TFRecordWriter(os.path.join(TFRECORDS_TRAIN_SET, "train_set_%d_from_font.tfrecords" % i))
-         for i in range(font_files_num)] + \
-        [tf.io.TFRecordWriter(os.path.join(TFRECORDS_TEST_SET, "test_set_%d_from_font.tfrecords" % i))
-         for i in range(font_files_num//6)]
+        [tf.io.TFRecordWriter(os.path.join(CHAR_TFRECORDS_DIR, "chinese_imgs_%d_from_font.tfrecords" % i))
+         for i in range(font_files_num*2)]
     
     print("Begin to generate images ...")
     chinese_char_num = len(CHAR2ID_DICT)
@@ -207,9 +188,9 @@ def generate_tfrecords_to_train(obj_size=CHAR_IMG_SIZE, num_imgs_per_font=NUM_IM
 """ ************************* 已有图片转化得到训练图片 ************************ """
 
 
-def get_external_image_paths():
+def get_external_image_paths(root_dir):
     
-    for root, dirs, files_list in os.walk(EXTERNEL_IMAGES_DIR):
+    for root, dirs, files_list in os.walk(root_dir):
         if len(files_list)>0:
             image_paths_list = []
             for file_name in files_list:
@@ -232,9 +213,9 @@ def convert_chinese_images_to_check(obj_size=CHAR_IMG_SIZE, augmentation=True):
     print("Begin to convert images ...")
     total_num = sum(font_images_num_list)
     count = 0
-    for font_type, image_paths_list in get_external_image_paths():
+    for font_type, image_paths_list in get_external_image_paths(root_dir=EXTERNEL_IMAGES_DIR):
         # 创建保存该字体图片的目录
-        font_img_dir = os.path.join(SAMPLES_DIR, font_type)
+        font_img_dir = os.path.join(CHAR_IMGS_DIR, font_type)
         remove_then_makedirs(font_img_dir)
 
         for image_path in image_paths_list:
@@ -265,7 +246,7 @@ def convert_chinese_images_to_check(obj_size=CHAR_IMG_SIZE, augmentation=True):
     return
 
 
-def convert_chinese_images_to_train(obj_size=CHAR_IMG_SIZE, num_imgs_per_font=NUM_IMAGES_PER_FONT):
+def convert_chinese_images(obj_size=CHAR_IMG_SIZE, num_imgs_per_font=NUM_IMAGES_PER_FONT):
     print("Get total images num ...")
     font_images_num_list = [len(os.listdir(os.path.join(EXTERNEL_IMAGES_DIR, content)))
                             for content in os.listdir(EXTERNEL_IMAGES_DIR)
@@ -274,14 +255,12 @@ def convert_chinese_images_to_train(obj_size=CHAR_IMG_SIZE, num_imgs_per_font=NU
     print("Begin to convert images ...")
     total_num = sum(font_images_num_list)
     count = 0
-    for font_type, image_paths_list in get_external_image_paths():
+    for font_type, image_paths_list in get_external_image_paths(root_dir=EXTERNEL_IMAGES_DIR):
 
         # 创建保存该字体图片的目录
-        train_dir = os.path.join(TRAIN_SET_DIR, font_type)
-        test_dir = os.path.join(TEST_SET_DIR, font_type)
-        remove_then_makedirs(train_dir)
-        remove_then_makedirs(test_dir)
-
+        save_dir = os.path.join(CHAR_IMGS_DIR, font_type)
+        remove_then_makedirs(save_dir)
+        
         for image_path in image_paths_list:
             # 加载外部图片，将图片调整为正方形
             # 为了保证图片旋转时不丢失信息，生成的图片应该比本来的图片稍微bigger
@@ -298,8 +277,6 @@ def convert_chinese_images_to_train(obj_size=CHAR_IMG_SIZE, num_imgs_per_font=NU
 
             # 保存生成的字体图片
             for index, PIL_img in enumerate(PIL_img_list):
-                # 让train_set和test_set的比例约为 5:1
-                save_dir = train_dir if random.random() < 0.85 else test_dir
                 image_name = os.path.basename(image_path).split(".")[0] + "_" + str(index) + ".jpg"
                 save_path = os.path.join(save_dir, image_name)
                 PIL_img.save(save_path, format="jpeg")
@@ -312,7 +289,7 @@ def convert_chinese_images_to_train(obj_size=CHAR_IMG_SIZE, num_imgs_per_font=NU
     return
 
 
-def convert_tfrecords_to_train(obj_size=CHAR_IMG_SIZE, num_imgs_per_font=NUM_IMAGES_PER_FONT):
+def convert_tfrecords(obj_size=CHAR_IMG_SIZE, num_imgs_per_font=NUM_IMAGES_PER_FONT):
     print("Get total images num ...")
     font_images_num_list = [len(os.listdir(os.path.join(EXTERNEL_IMAGES_DIR, content)))
                             for content in os.listdir(EXTERNEL_IMAGES_DIR)
@@ -320,24 +297,20 @@ def convert_tfrecords_to_train(obj_size=CHAR_IMG_SIZE, num_imgs_per_font=NUM_IMA
     font_category_num = len(font_images_num_list)
     
     # 创建保存tfrecords文件的目录
-    check_or_makedirs(TFRECORDS_TRAIN_SET)
-    check_or_makedirs(TFRECORDS_TEST_SET)
+    check_or_makedirs(CHAR_TFRECORDS_DIR)
 
     # 可以把变换的图片直接存入tfrecords文件
     # 不必将变换的图片先保存到磁盘，再从磁盘读取出来保存到tfrecords文件，这样效率太低
     # 通常是用一种字体的一个字图片增强出很多个图片，这些图片最好是分开存放
     # 若直接把同一字体同一个字图片增强出的多张图片连续放到同一个tfrecords里，那么每一个训练batch的多样性就不好
-    # 这里的设置是有多少种字体就生成多少个tfreords文件
     writers_list = \
-        [tf.io.TFRecordWriter(os.path.join(TFRECORDS_TRAIN_SET, "train_set_%d_from_img.tfrecords" % i))
-         for i in range(font_category_num)] + \
-        [tf.io.TFRecordWriter(os.path.join(TFRECORDS_TEST_SET, "test_set_%d_from_img.tfrecords" % i))
-         for i in range(font_category_num//6)]
+        [tf.io.TFRecordWriter(os.path.join(CHAR_TFRECORDS_DIR, "chinese_imgs_%d_from_img.tfrecords" % i))
+         for i in range(font_category_num*2)]
 
     print("Begin to convert images ...")
     total_num = sum(font_images_num_list)
     count = 0
-    for font_type, image_paths_list in get_external_image_paths():
+    for font_type, image_paths_list in get_external_image_paths(root_dir=EXTERNEL_IMAGES_DIR):
 
         for image_path in image_paths_list:
             chinese_char = os.path.basename(image_path)[0]
@@ -431,14 +404,15 @@ def display_tfrecords(tfrecords_file):
 
 if __name__ == '__main__':
     # generate_chinese_images_to_check(obj_size=CHAR_IMG_SIZE, augmentation=False)
-    # generate_chinese_images_to_train(num_imgs_per_font=3)
-    # generate_tfrecords_to_train(num_imgs_per_font=NUM_IMAGES_PER_FONT)
-
+    # generate_chinese_images(num_imgs_per_font=3)
+    # generate_tfrecords(num_imgs_per_font=NUM_IMAGES_PER_FONT)
+    #
     # convert_chinese_images_to_check(obj_size=CHAR_IMG_SIZE, augmentation=True)
-    # convert_chinese_images_to_train(num_imgs_per_font=3)
-    # convert_tfrecords_to_train(num_imgs_per_font=10)
-
-    # display_tfrecords(tfrecords_file=os.path.join(TFRECORDS_TRAIN_SET, "train_set_0_from_font.tfrecords"))
-    # display_tfrecords(tfrecords_file=os.path.join(TFRECORDS_TEST_SET, "test_set_0_from_font.tfrecords"))
+    # convert_chinese_images(num_imgs_per_font=3)
+    # convert_tfrecords(num_imgs_per_font=10)
+    #
+    # display_tfrecords(tfrecords_file=os.path.join(CHAR_TFRECORDS_DIR, "chinese_imgs_0_from_font.tfrecords"))
+    # display_tfrecords(tfrecords_file=os.path.join(CHAR_TFRECORDS_DIR, "chinese_imgs_0_from_img.tfrecords"))
 
     print("Done!")
+    
