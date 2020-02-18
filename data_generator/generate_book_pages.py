@@ -20,7 +20,7 @@ from data_generator.generate_text_lines import generate_one_row_chars, generate_
 from data_generator.generate_text_lines import generate_one_col_chars, generate_two_cols_chars
 
 
-def generate_book_pages(obj_num=10, type="horizontal"):
+def generate_book_pages(obj_num=10, type="horizontal", page_shape=None):
     if type.lower() in ("h", "horizontal"):
         type = "h"
     elif type.lower() in ("v", "vertical"):
@@ -37,12 +37,13 @@ def generate_book_pages(obj_num=10, type="horizontal"):
 
     with open(book_page_tags_file, "w", encoding="utf-8") as fw:
         for i in range(obj_num):
-            if type == "h":
-                book_page_shape = (random.randint(480, 720), random.randint(720, 1080))
-            if type == "v":
-                book_page_shape = (random.randint(720, 1080), random.randint(480, 720))
+            if page_shape is None and type == "h":
+                page_shape = (random.randint(480, 720), random.randint(720, 1080))
+            if page_shape is None and type == "v":
+                page_shape = (random.randint(720, 1080), random.randint(480, 720))
 
-            PIL_page, text_bbox_list = create_book_page(book_page_shape, type=type)
+            PIL_page, text_bbox_list = create_book_page(page_shape, type=type)
+            PIL_page = PIL_page.convert("RGB")
             
             img_name = "book_page_%d.jpg" % i
             save_path = os.path.join(book_page_imgs_dir, img_name)
@@ -54,7 +55,7 @@ def generate_book_pages(obj_num=10, type="horizontal"):
                 sys.stdout.flush()
 
 
-def generate_book_page_tfrecords(obj_num=10, type="horizontal"):
+def generate_book_page_tfrecords(obj_num=10, type="horizontal", page_shape=None):
     if type.lower() in ("h", "horizontal"):
         type = "h"
     elif type.lower() in ("v", "vertical"):
@@ -78,12 +79,12 @@ def generate_book_page_tfrecords(obj_num=10, type="horizontal"):
     # 保存生成的书页图片
     for i in range(obj_num):
         writer = random.choice(writers_list)
-        if type == "h":
-            book_page_shape = (random.randint(480, 720), random.randint(720, 1080))
-        if type == "v":
-            book_page_shape = (random.randint(720, 1080), random.randint(480, 720))
+        if page_shape is None and type == "h":
+            page_shape = (random.randint(480, 720), random.randint(720, 1080))
+        if page_shape is None and type == "v":
+            page_shape = (random.randint(720, 1080), random.randint(480, 720))
 
-        PIL_page, text_bbox_list = create_book_page(book_page_shape, type=type)
+        PIL_page, text_bbox_list = create_book_page(page_shape, type=type)
 
         bytes_image = PIL_page.tobytes()  # 将图片转化为原生bytes
         text_boxes = np.array([text_box for text_box in text_bbox_list], dtype=np.int32).tobytes()
@@ -128,7 +129,7 @@ def create_book_page(shape=(960, 540), type="horizontal"):
     # 随机确定书页边框
     margin_w = round(random.uniform(0.01, 0.05) * page_width)
     margin_h = round(random.uniform(0.01, 0.05) * page_height)
-    margin_line_thickness = random.randint(2, 8)
+    margin_line_thickness = random.randint(2, 6)
     line_thickness = round(margin_line_thickness / 2)
     if draw is not None:
         # 点的坐标格式为(x, y)，不是(y, x)
@@ -154,7 +155,7 @@ def create_book_page(shape=(960, 540), type="horizontal"):
             np_page = np.array(PIL_page, dtype=np.uint8)
         
         # 随机决定字符间距占行距的比例
-        char_spacing = (random.uniform(0.05, 0.15), random.uniform(0.02, 0.2))  # (高方向, 宽方向)
+        char_spacing = (random.uniform(0.05, 0.15), random.uniform(0.0, 0.2))  # (高方向, 宽方向)
         
         # 逐行生成汉字
         for i in range(len(ys) - 1):
@@ -191,7 +192,7 @@ def create_book_page(shape=(960, 540), type="horizontal"):
             np_page = np.array(PIL_page, dtype=np.uint8)
 
         # 随机决定字符间距占列距的比例
-        char_spacing = (random.uniform(0.02, 0.2), random.uniform(0.05, 0.15))  # (高方向, 宽方向)
+        char_spacing = (random.uniform(0.0, 0.2), random.uniform(0.05, 0.15))  # (高方向, 宽方向)
 
         # 逐列生成汉字，最右边为第一列
         for i in range(len(xs) - 1, 0, -1):
@@ -255,8 +256,8 @@ def display_tfrecords(tfrecords_file):
 
 
 if __name__ == '__main__':
-    # generate_book_pages(obj_num=10, type="horizontal")
-    # generate_book_pages(obj_num=10, type="vertical")
+    generate_book_pages(obj_num=100, type="horizontal", page_shape=(416, 416))
+    generate_book_pages(obj_num=100, type="vertical", page_shape=(416, 416))
     # generate_book_page_tfrecords(obj_num=100, type="horizontal")
     # generate_book_page_tfrecords(obj_num=100, type="vertical")
     

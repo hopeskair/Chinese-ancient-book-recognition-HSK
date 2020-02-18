@@ -26,7 +26,7 @@ from data_generator.img_utils import load_external_image_bigger
 from data_generator.generate_chinese_images import get_external_image_paths
 
 
-def generate_text_line_imgs(obj_num=100, type="horizontal"):
+def generate_text_line_imgs(obj_num=100, type="horizontal", text_shape=None):
     if type.lower() in ("h", "horizontal"):
         type = "h"
     elif type.lower() in ("v", "vertical"):
@@ -43,12 +43,12 @@ def generate_text_line_imgs(obj_num=100, type="horizontal"):
     
     with open(text_line_tags_file, "w", encoding="utf-8") as fw:
         for i in range(obj_num):
-            if type == "h":
-                text_line_shape = (random.randint(36, 96), random.randint(360, 960))
-            if type == "v":
-                text_line_shape = (random.randint(360, 960), random.randint(36, 96))
+            if text_shape is None and type == "h":
+                text_shape = (random.randint(36, 96), random.randint(360, 960))
+            if text_shape is None and type == "v":
+                text_shape = (random.randint(360, 960), random.randint(36, 96))
             
-            PIL_text, chinese_char_and_box_list = create_text_line(text_line_shape, type=type)
+            PIL_text, chinese_char_and_box_list = create_text_line(text_shape, type=type)
             
             img_name = "book_pages_%d.jpg" % i
             save_path = os.path.join(text_line_imgs_dir, img_name)
@@ -60,7 +60,7 @@ def generate_text_line_imgs(obj_num=100, type="horizontal"):
                 sys.stdout.flush()
 
 
-def generate_text_line_tfrecords(obj_num=100, type="horizontal"):
+def generate_text_line_tfrecords(obj_num=100, type="horizontal", text_shape=None):
     if type.lower() in ("h", "horizontal"):
         type = "h"
     elif type.lower() in ("v", "vertical"):
@@ -85,12 +85,12 @@ def generate_text_line_tfrecords(obj_num=100, type="horizontal"):
     for i in range(obj_num):
         writer = random.choice(writers_list)
 
-        if type == "h":
-            text_line_shape = (random.randint(36, 96), random.randint(360, 960))
-        if type == "v":
-            text_line_shape = (random.randint(360, 960), random.randint(36, 96))
+        if text_shape is None and type == "h":
+            text_shape = (random.randint(36, 96), random.randint(360, 960))
+        if text_shape is None and type == "v":
+            text_shape = (random.randint(360, 960), random.randint(36, 96))
 
-        PIL_text, chinese_char_and_box_list = create_text_line(text_line_shape, type=type)
+        PIL_text, chinese_char_and_box_list = create_text_line(text_shape, type=type)
 
         bytes_image = PIL_text.tobytes()  # 将图片转化为原生bytes
         bytes_chars = "".join([chinese_char for chinese_char, gt_box in chinese_char_and_box_list]).encode("utf-8")
