@@ -1,5 +1,5 @@
 import argparse
-from crnn import CRNN
+from recognition_crnn.crnn import CRNN
 
 CHAR_VECTOR = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-'.!?,\"&"
 

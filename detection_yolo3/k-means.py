@@ -11,7 +11,7 @@ import seaborn as sns
 sns.set()  # for plot styling
 
 from sklearn.cluster import KMeans
-from sklearn.datasets.samples_generator import make_blobs
+from sklearn.datasets._samples_generator import make_blobs
 
 
 def test_of_k_means():

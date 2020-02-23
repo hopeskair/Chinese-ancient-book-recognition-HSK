@@ -5,7 +5,7 @@ Copyright (c) 2018. All rights reserved.
 Created by C. L. Wang on 2018/8/2
 """
 
-from keras import backend as K
+from tensorflow.keras import backend as K
 import tensorflow as tf
 
 sess = K.get_session()

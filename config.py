@@ -43,12 +43,24 @@ FONT_FINISHED_DIR = os.path.join(CURR_DIR, "chinese_fonts_finished")
 # EXTERNEL_IMAGES_DIR = os.path.join(CURR_DIR, "../ziku_images")
 EXTERNEL_IMAGES_DIR = "E:/pycharm_project/ziku_images"
 
+# chinese char images
 CHAR_IMG_SIZE = 64
 MAX_ROTATE_ANGLE = 10
 NUM_IMAGES_PER_FONT = 10
+
+# text line images
+TEXT_LINE_SIZE = CHAR_IMG_SIZE
 # ************************ generate image data ***************************
 
 
 # *********************** data format conversion *************************
 YOLO3_BOOK_PAGE_TAGS_FILE = os.path.join(DATA_DIR, "book_pages", "book_pages_tags_yolo3.txt")
+CRNN_TEXT_LINE_TAGS_FILE_H = os.path.join(DATA_DIR, "text_lines", "text_lines_tags_yolo3_horizontal.txt")
+CRNN_TEXT_LINE_TAGS_FILE_V = os.path.join(DATA_DIR, "text_lines", "text_lines_tags_yolo3_vertical.txt")
 # *********************** data format conversion *************************
+
+
+# ***************************** Train ************************************
+# text line recognition
+BATCH_SIZE_TEXT_LINE = 16
+# ***************************** Train ************************************

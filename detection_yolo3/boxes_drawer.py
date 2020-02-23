@@ -7,7 +7,7 @@ Created by C. L. Wang on 2018/7/11
 import cv2
 import os
 
-from root_dir import ROOT_DIR
+from detection_yolo3.root_dir import ROOT_DIR
 
 
 def draw_img(image, boxes):

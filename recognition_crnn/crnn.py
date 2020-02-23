@@ -1,19 +1,14 @@
+# -*- encoding: utf-8 -*-
+# Author: hushukai
+
 import os
 import time
-import numpy as np
 import tensorflow as tf
-from scipy.misc import imread, imresize, imsave
 from tensorflow.keras import layers
 
-
-from data_manager import DataManager
-from utils import (
-    sparse_tuple_from,
-    resize_image,
-    label_to_array,
-    ground_truth_to_word,
-    levenshtein,
-)
+from networks.resnet import ResNet151V2_for_crnn
+from networks.resnext import ResNeXt151_for_crnn
+from networks.densenet import DenseNet112_for_crnn
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
@@ -340,8 +335,8 @@ class CRNN(object):
     def save_frozen_model(
         self,
         path=None,
-        # optimize=False,
-        # input_nodes=["input", "seq_len"],
+        optimize=False,
+        input_nodes=["input", "seq_len"],
         output_nodes=["dense_decoded"],
     ):
         if not path or len(path) == 0:
@@ -362,6 +357,9 @@ class CRNN(object):
 
         # optimize graph
         # if optimize:
+        #     output_graph_def = optimize_for_inference_lib.optimize_for_inference(
+        #         output_graph_def, input_nodes, output_nodes, tf.float32.as_datatype_enum
+        #     )
 
         with open(path, "wb") as f:
             f.write(output_graph_def.SerializeToString())

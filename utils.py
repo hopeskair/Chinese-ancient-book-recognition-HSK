@@ -26,9 +26,9 @@ def chinese_labels_dict():
             else:
                 raise ValueError("The character must be unique, but multiple character %s."%char)
     
-    num_labels = len(char2id_dict)
+    num_chars = len(char2id_dict)
     
-    return id2char_dict, char2id_dict, num_labels
+    return id2char_dict, char2id_dict, num_chars
 
 
 def ignorable_chars():
@@ -49,7 +49,7 @@ def important_chars():
     return "".join(chars)
 
 
-ID2CHAR_DICT, CHAR2ID_DICT, NUM_LABELS = chinese_labels_dict()
+ID2CHAR_DICT, CHAR2ID_DICT, NUM_CHARS = chinese_labels_dict()
 IGNORABLE_CHARS = ignorable_chars()
 IMPORTANT_CHARS = important_chars()
 

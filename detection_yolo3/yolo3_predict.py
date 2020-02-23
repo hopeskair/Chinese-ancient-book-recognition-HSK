@@ -15,10 +15,10 @@ from timeit import default_timer as timer
 
 import numpy as np
 from PIL import Image, ImageFont, ImageDraw
-from keras import backend as K
-from keras.layers import Input
-from yolo3.model import yolo_eval, yolo_body
-from yolo3.utils import letterbox_image
+from tensorflow.keras import backend as K
+from tensorflow.keras.layers import Input
+from detection_yolo3.yolo3.model import yolo_eval, yolo_body
+from detection_yolo3.yolo3.utils import letterbox_image
 
 
 class YOLO(object):
