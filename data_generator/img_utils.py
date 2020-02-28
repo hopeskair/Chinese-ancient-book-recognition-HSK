@@ -27,9 +27,9 @@ def generate_bigger_image_by_font(chinese_char, font_file, image_size=int(CHAR_I
 
     font_size = int(0.85 * width)
 
-    # Windows系统不能正确解析路径中的汉字时，将路径按其默认编码方式编码
-    # if "windows" in platform.architecture()[1].lower():
-    #     font_file = font_file.encode(sys.getdefaultencoding())
+    # Windows系统不能正确解析路径中的汉字时，将其按系统默认编码方式编码即可
+    if "windows" in platform.architecture()[1].lower():
+        font_file = font_file.encode(sys.getdefaultencoding())
     font_object = ImageFont.truetype(font_file, font_size)
 
     start_x = (width - font_size) // 2

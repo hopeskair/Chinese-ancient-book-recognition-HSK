@@ -13,8 +13,7 @@
   (https://github.com/taehoonlee/tensornets/blob/master/tensornets/densenets.py)
 """
 
-import os
-from tensorflow.keras import layers, models, backend
+from tensorflow.keras import layers, backend
 
 
 def conv_block(x, growth, name):
@@ -61,17 +60,16 @@ def transition_block(x, reduction_rate, name):
     return x
 
 
-def DenseNet(inputs,
+def DenseNet(x,
              blocks,
              include_top=False,
              classes=None,
-             pooling=None,
-             weights_path=None):
+             pooling=None):
     """Instantiates the DenseNet architecture."""
 
     bn_axis = 3  # image data format: channels_last
     
-    x = layers.ZeroPadding2D(padding=((2, 2), (2, 2)))(inputs)
+    x = layers.ZeroPadding2D(padding=((2, 2), (2, 2)))(x)
     x = layers.Conv2D(64, 5, strides=1, use_bias=False, name='conv1/conv')(x)
     x = layers.BatchNormalization(
         axis=bn_axis, epsilon=1.001e-5, name='conv1/bn')(x)
@@ -99,23 +97,11 @@ def DenseNet(inputs,
             x = layers.GlobalAveragePooling2D(name='avg_pool')(x)
         elif pooling == 'max':
             x = layers.GlobalMaxPooling2D(name='max_pool')(x)
-
-    # Create model.
-    if blocks == [6, 12, 24, 16]:
-        model = models.Model(inputs, x, name='densenet121')
-    elif blocks == [6, 12, 32, 32]:
-        model = models.Model(inputs, x, name='densenet169')
-    elif blocks == [6, 12, 48, 32]:
-        model = models.Model(inputs, x, name='densenet201')
-    else:
-        model = models.Model(inputs, x, name='densenet')
-
-    # Load weights.
-    if weights_path is not None and os.path.exists(weights_path):
-        model.load_weights(weights_path)
-
-    return model
+    
+    return x
 
 
-def DenseNet112_for_crnn(inputs):
-    return DenseNet(inputs=inputs, blocks=[8, 12, 18, 16])  # 1/8 size
+def DenseNet112_for_crnn(inputs, scope="densenet"):
+    with backend.name_scope(scope):
+        outputs = DenseNet(inputs, blocks=[8, 12, 18, 16])  # 1/8 size
+    return outputs

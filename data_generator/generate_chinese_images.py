@@ -9,7 +9,7 @@ from PIL import Image
 import numpy as np
 import tensorflow as tf
 
-from utils import CHAR2ID_DICT
+from utils import CHAR2ID_DICT, BLANK_CHAR
 from config import CHAR_IMG_SIZE, NUM_IMAGES_PER_FONT
 from config import FONT_FILE_DIR, FONT_FINISHED_DIR, EXTERNEL_IMAGES_DIR
 from config import CHAR_IMGS_DIR, CHAR_TFRECORDS_DIR
@@ -25,7 +25,9 @@ from data_generator.img_utils import generate_bigger_image_by_font, load_externa
 def generate_all_chinese_images_bigger(font_file, image_size=int(CHAR_IMG_SIZE*1.2)):
     all_chinese_list = list(CHAR2ID_DICT.keys())
     # all_chinese_list = ["无", "爲", "一", "万"]
-
+    
+    if BLANK_CHAR in all_chinese_list:
+        all_chinese_list.remove(BLANK_CHAR)
     for chinese_char in all_chinese_list:
         try:  # 生成字体图片
             bigger_PIL_img = generate_bigger_image_by_font(chinese_char, font_file, image_size)

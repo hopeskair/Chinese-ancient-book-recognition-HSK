@@ -55,12 +55,13 @@ TEXT_LINE_SIZE = CHAR_IMG_SIZE
 
 # *********************** data format conversion *************************
 YOLO3_BOOK_PAGE_TAGS_FILE = os.path.join(DATA_DIR, "book_pages", "book_pages_tags_yolo3.txt")
-CRNN_TEXT_LINE_TAGS_FILE_H = os.path.join(DATA_DIR, "text_lines", "text_lines_tags_yolo3_horizontal.txt")
-CRNN_TEXT_LINE_TAGS_FILE_V = os.path.join(DATA_DIR, "text_lines", "text_lines_tags_yolo3_vertical.txt")
+CRNN_TEXT_LINE_TAGS_FILE_H = os.path.join(DATA_DIR, "text_lines", "text_lines_tags_crnn_horizontal.txt")
+CRNN_TEXT_LINE_TAGS_FILE_V = os.path.join(DATA_DIR, "text_lines", "text_lines_tags_crnn_vertical.txt")
 # *********************** data format conversion *************************
 
 
 # ***************************** Train ************************************
 # text line recognition
 BATCH_SIZE_TEXT_LINE = 16
+CRNN_CKPT_DIR = os.path.join(DATA_DIR, "recognition_crnn", "ckpt")
 # ***************************** Train ************************************

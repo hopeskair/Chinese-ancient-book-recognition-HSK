@@ -7,9 +7,9 @@ from PIL import Image
 from config import TEXT_LINE_SIZE
 
 
-def sparse_tensor_when_cpu(raw_batch_labels, dtype=np.int32):
+def sparse_tensor_from_list(raw_batch_labels, dtype=np.int32):
     """
-        Inspired from https://github.com/igormq/ctc_tensorflow_example/blob/master/utils.py
+        Inspired from https://github.com/igormq/ctc_tensorflow_example/blob/master/util.py
     """
     indices = []
     values = []
@@ -30,12 +30,28 @@ def sparse_tensor_when_cpu(raw_batch_labels, dtype=np.int32):
     return sparse_tensor
 
 
-def dense_tensor_when_gpu(raw_batch_labels, dtype=np.int32, pad_value=0):
+def sparse_tensor_to_list(np_indices, np_values):
+    indices = np_indices.tolist()
+    labels = np_values.tolist()
     
-    indices, values, dense_shape = sparse_tensor_when_cpu(raw_batch_labels, dtype=dtype)
+    triad_list = [(row, col, label) for (row, col), label in zip(indices, labels)]
+    triad_list.sort(key=lambda tup:(tup[0], tup[1]))
+    
+    batch_size = triad_list[-1][0] + 1
+    batch_labels = [[] for _ in range(batch_size)]
+    
+    for (row, col), label in triad_list:
+        batch_labels[row].append(label)
+    
+    return batch_labels
+    
 
+def dense_tensor_from_list(raw_batch_labels, dtype=np.int32, pad_value=0):
+    
+    indices, values, dense_shape = sparse_tensor_from_list(raw_batch_labels, dtype=dtype)
+    
     dense_tensor = np.empty(dense_shape, dtype=dtype)
-    dense_tensor.fill(value=pad_value)
+    dense_tensor.fill(pad_value)
     dense_tensor[indices[:,0], indices[:,1]] = values
     
     return dense_tensor

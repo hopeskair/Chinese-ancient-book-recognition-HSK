@@ -17,8 +17,7 @@
   (https://github.com/facebook/fb.resnet.torch/blob/master/models/preresnet.lua)
 """
 
-import os
-from tensorflow.keras import layers, models, backend
+from tensorflow.keras import layers, backend
 
 
 def block1(x, filters, kernel_size=3, stride=1,
@@ -108,20 +107,18 @@ def stack2(x, filters, blocks, stride1=2, name=None):
     return x
 
 
-def ResNet(inputs,
+def ResNet(x,
            stack_fn,
            use_bias,
            block_preact,
-           model_name='resnet',
            include_top=False,
            classes=None,
-           pooling=None,
-           weights_path=None):
+           pooling=None):
     """Instantiates the ResNet, ResNetV2 and ResNeXt architecture."""
 
     bn_axis = 3  # image data format: channels_last
 
-    x = layers.ZeroPadding2D(padding=((2, 2), (2, 2)), name='conv1_pad')(inputs)
+    x = layers.ZeroPadding2D(padding=((2, 2), (2, 2)), name='conv1_pad')(x)
     x = layers.Conv2D(64, 5, strides=1, use_bias=use_bias, name='conv1_conv')(x)
 
     if block_preact is False:
@@ -147,17 +144,10 @@ def ResNet(inputs,
         elif pooling == 'max':
             x = layers.GlobalMaxPooling2D(name='max_pool')(x)
 
-    # Create model.
-    model = models.Model(inputs, x, name=model_name)
-    
-    # Load weights.
-    if weights_path is not None and os.path.exists(weights_path):
-        model.load_weights(weights_path)
-
-    return model
+    return x
 
 
-def ResNet151V2_for_crnn(inputs):
+def ResNet151V2_for_crnn(inputs, scope="resnet"):
     def stack_fn(x):
         x = stack2(x, 32, 4, name='conv2')
         x = stack2(x, 64, 12, name='conv3')
@@ -165,8 +155,7 @@ def ResNet151V2_for_crnn(inputs):
         x = stack2(x, 256, 6, stride1=1, name='conv5')
         return x
     
-    return ResNet(inputs=inputs,
-                   stack_fn=stack_fn,
-                   use_bias=True,
-                   block_preact=True,
-                   model_name='resnet_v2')  # size 1/8
+    with backend.name_scope(scope):
+        outputs = ResNet(inputs, stack_fn, use_bias=True, block_preact=True)  # 1/8 size
+    
+    return outputs

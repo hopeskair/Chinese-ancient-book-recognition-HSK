@@ -8,7 +8,7 @@ import random
 import cv2
 import numpy as np
 import tensorflow as tf
-from PIL import Image, ImageDraw
+from PIL import Image
 
 from config import TEXT_LINE_IMGS_H, TEXT_LINE_TAGS_FILE_H
 from config import TEXT_LINE_IMGS_V, TEXT_LINE_TAGS_FILE_V
@@ -296,9 +296,9 @@ def generate_char_img_into_unclosed_box(np_background, x1, y1, x2=None, y2=None,
     try:
         np_background[box_y1:box_y2 + 1, box_x1:box_x2 + 1] = np_char_img
     except ValueError as e:
-        print('Exception:', e)
-        print("The size of char_img is larger than the length of (y1, x1) to background_img's edge.")
-        print("Now, try another char_img ...")
+        # print('Exception:', e)
+        # print("The size of char_img is larger than the length of (y1, x1) to background_img's edge.")
+        # print("Now, try another char_img ...")
         return generate_char_img_into_unclosed_box(np_background, x1, y1, x2, y2, char_spacing)
 
     # 包围汉字的最小box作为bounding-box
@@ -351,13 +351,13 @@ def chinese_char_img_generator_using_font(img_size=96):
         count = 0
         for font_file in font_file_list:
             count += 1
-            print("Char image generator: %d of %d" % (count, total))
+            # print("Char image generator: %d of %d" % (count, total))
             
             random.shuffle(all_chinese_list)
             for chinese_char in all_chinese_list:
                 if chinese_char in IGNORABLE_CHARS:
                     continue
-
+                
                 # 生成字体图片
                 bigger_PIL_img = generate_bigger_image_by_font(chinese_char, font_file, img_size)
                 # 检查生成的灰度图像是否可用，黑底白字
@@ -389,7 +389,7 @@ def chinese_char_img_generator_using_image():
         count = 0
         for font_type, image_paths_list in get_external_image_paths(root_dir=EXTERNEL_IMAGES_DIR):
             count += 1
-            print("Char image generator: %d of %d" % (count, total))
+            # print("Char image generator: %d of %d" % (count, total))
             
             for image_path in image_paths_list:
                 chinese_char = os.path.basename(image_path)[0]
@@ -461,8 +461,8 @@ def display_tfrecords(tfrecords_file):
 
 
 if __name__ == '__main__':
-    # generate_text_line_imgs(obj_num=100, type="horizontal")
-    # generate_text_line_imgs(obj_num=100, type="vertical")
+    generate_text_line_imgs(obj_num=100, type="horizontal")
+    generate_text_line_imgs(obj_num=100, type="vertical")
     # generate_text_line_tfrecords(obj_num=100, type="horizontal")
     # generate_text_line_tfrecords(obj_num=100, type="vertical")
     

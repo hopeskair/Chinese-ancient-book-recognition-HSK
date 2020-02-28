@@ -37,5 +37,6 @@ venv.bak/
 chinese_fonts/
 chinese_fonts_finished/
 data/
+*/ckpt/
 */logs/
 */model_data/

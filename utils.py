@@ -16,7 +16,7 @@ def chinese_labels_dict():
     char2id_dict = {}
     with open(CHINESE_LABEL_FILE, "r", encoding="utf-8") as fr:
         for line in fr:
-            label_id, char = line.strip().split()
+            label_id, char = line.strip().split()[:2]
             label_id = int(label_id)
             if label_id not in id2char_dict and char not in char2id_dict:
                 id2char_dict[label_id] = char
@@ -52,12 +52,13 @@ def important_chars():
 ID2CHAR_DICT, CHAR2ID_DICT, NUM_CHARS = chinese_labels_dict()
 IGNORABLE_CHARS = ignorable_chars()
 IMPORTANT_CHARS = important_chars()
+BLANK_CHAR = ID2CHAR_DICT[0]
 
 
 def check_or_makedirs(dir_name):
     if not os.path.exists(dir_name):
         os.makedirs(dir_name)
-        
+
 
 def remove_then_makedirs(dir_name):
     if os.path.exists(dir_name):

@@ -11,7 +11,7 @@
   (https://github.com/facebookresearch/ResNeXt/blob/master/models/resnext.lua)
 """
 
-from tensorflow.keras import layers, models, backend
+from tensorflow.keras import layers, backend
 from networks.resnet import ResNet
 
 
@@ -67,7 +67,7 @@ def stack3(x, filters, blocks, stride1=2, groups=32, name=None):
     return x
 
 
-def ResNeXt151_for_crnn(inputs):
+def ResNeXt151_for_crnn(inputs, scope="resnext"):
     def stack_fn(x):
         x = stack3(x, 64, 4, stride1=1, name='conv2')
         x = stack3(x, 128, 12, name='conv3')
@@ -75,8 +75,7 @@ def ResNeXt151_for_crnn(inputs):
         x = stack3(x, 512, 6, name='conv5')
         return x
     
-    return ResNet(inputs=inputs,
-                   stack_fn=stack_fn,
-                   use_bias=False,
-                   block_preact=False,
-                   model_name='resnext')  # size 1/8
+    with backend.name_scope(scope):
+        outputs = ResNet(inputs, stack_fn, use_bias=False, block_preact=False)  # 1/8 size
+    
+    return outputs

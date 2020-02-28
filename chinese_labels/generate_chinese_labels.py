@@ -8,15 +8,18 @@ CURR_DIR = os.path.dirname(__file__)
 def generate_labels(label_file, chars_file_list):
     label_file_path = os.path.join(CURR_DIR, label_file)
     chars_file_paths = [os.path.join(CURR_DIR, chars_file) for chars_file in chars_file_list]
-    
-    id2char_dict = {}
+
+    # In tf.nn.ctc_loss, default blank label is 0. Here use "*" as blank.
+    id2char_dict = {0: "*"}
     if os.path.exists(label_file_path):
         with open(label_file_path, "r", encoding="utf-8") as fr:
             for line in fr:
-                label_id, char = line.strip().split()
+                label_id, char = line.strip().split()[:2]
                 label_id = int(label_id)
                 if label_id not in id2char_dict:
                     id2char_dict[label_id] = char
+                elif label_id == 0:
+                    pass
                 else:
                     raise ValueError("The label must be unique, but multiple label %d."%label_id)
     
@@ -67,7 +70,7 @@ def generate_chinese_labels_mixed_all():
 
 
 if __name__ == '__main__':
-    generate_chinese_labels_simplified_level1()
+    # generate_chinese_labels_simplified_level1()
     # generate_chinese_labels_simplified_level2()
     # generate_chinese_labels_traditional_common()
     # generate_chinese_labels_traditional_all()
