@@ -119,7 +119,7 @@ def ResNet(x,
     bn_axis = 3  # image data format: channels_last
 
     x = layers.ZeroPadding2D(padding=((2, 2), (2, 2)), name='conv1_pad')(x)
-    x = layers.Conv2D(64, 5, strides=1, use_bias=use_bias, name='conv1_conv')(x)
+    x = layers.Conv2D(64, 5, strides=2, use_bias=use_bias, name='conv1_conv')(x)
 
     if block_preact is False:
         x = layers.BatchNormalization(axis=bn_axis, epsilon=1.001e-5,
@@ -147,15 +147,38 @@ def ResNet(x,
     return x
 
 
-def ResNet151V2_for_crnn(inputs, scope="resnet"):
+def ResNet58V2_for_crnn(inputs, scope="resnet"):
     def stack_fn(x):
-        x = stack2(x, 32, 4, name='conv2')
-        x = stack2(x, 64, 12, name='conv3')
-        x = stack2(x, 128, 28, name='conv4')
-        x = stack2(x, 256, 6, stride1=1, name='conv5')
+        x = stack2(x, 64, 3, name='conv2')
+        x = stack2(x, 128, 8, name='conv3')
+        x = stack2(x, 256, 8, stride1=1, name='conv4')
+        # x = stack2(x, 256, 28, name='conv4')
+        # x = stack2(x, 512, 6, stride1=1, name='conv5')
         return x
     
     with backend.name_scope(scope):
         outputs = ResNet(inputs, stack_fn, use_bias=True, block_preact=True)  # 1/8 size
     
     return outputs
+
+
+def ResNet76V2_for_yolo(inputs, scope="resnet"):
+    def stack_fn(x):
+        x = stack2(x, 64, 3, name='conv2')
+        x1 = stack2(x, 128, 8, name='conv3')   # 1/8 size
+        x2 = stack2(x1, 256, 8, name='conv4')  # 1/16 size
+        x3 = stack2(x2, 512, 6, name='conv5')  # 1/32 size
+        return [x1, x2, x3]
+    
+    with backend.name_scope(scope):
+        x_list = ResNet(inputs, stack_fn, use_bias=True, block_preact=None)
+
+        bn_axis = 3  # image data format: channels_last
+        features_list = []
+        for i, x in enumerate(x_list):
+            x = layers.BatchNormalization(axis=bn_axis, epsilon=1.001e-5,
+                                          name='post_bn_%d'%i)(x)
+            feat = layers.Activation('relu', name='post_relu_%d'%i)(x)
+            features_list.append(feat)
+    
+    return features_list

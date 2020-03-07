@@ -70,20 +70,17 @@ def DenseNet(x,
     bn_axis = 3  # image data format: channels_last
     
     x = layers.ZeroPadding2D(padding=((2, 2), (2, 2)))(x)
-    x = layers.Conv2D(64, 5, strides=1, use_bias=False, name='conv1/conv')(x)
-    x = layers.BatchNormalization(
-        axis=bn_axis, epsilon=1.001e-5, name='conv1/bn')(x)
-    x = layers.Activation('relu', name='conv1/relu')(x)
+    x = layers.Conv2D(64, 5, strides=2, use_bias=False, name='conv1/conv')(x)
+    # x = layers.BatchNormalization(
+    #     axis=bn_axis, epsilon=1.001e-5, name='conv1/bn')(x)
+    # x = layers.Activation('relu', name='conv1/relu')(x)
     # x = layers.ZeroPadding2D(padding=((1, 1), (1, 1)))(x)
     # x = layers.MaxPooling2D(3, strides=2, name='pool1')(x)
-
-    x = dense_block(x, blocks[0], name='conv2')
-    x = transition_block(x, 0.5, name='pool2')
-    x = dense_block(x, blocks[1], name='conv3')
-    x = transition_block(x, 0.5, name='pool3')
-    x = dense_block(x, blocks[2], name='conv4')
-    x = transition_block(x, 0.5, name='pool4')
-    x = dense_block(x, blocks[3], name='conv5')
+    
+    for i in range(len(blocks)-1):
+        x = dense_block(x, blocks[i], name='conv%d'%(i+2))
+        x = transition_block(x, 0.5, name='pool%d'%(i+2))
+    x = dense_block(x, blocks[-1], name='conv%d'%(len(blocks)-1+2))
 
     x = layers.BatchNormalization(
         axis=bn_axis, epsilon=1.001e-5, name='bn')(x)
@@ -101,7 +98,33 @@ def DenseNet(x,
     return x
 
 
-def DenseNet112_for_crnn(inputs, scope="densenet"):
+def DenseNet53_for_crnn(inputs, scope="densenet"):
     with backend.name_scope(scope):
-        outputs = DenseNet(inputs, blocks=[8, 12, 18, 16])  # 1/8 size
+        outputs = DenseNet(inputs, blocks=[3, 12, 10])  # 1/8 size
     return outputs
+
+
+def DenseNet73_for_yolo(inputs, scope="densenet"):
+    blocks = [3, 9, 8, 8, 6]
+    
+    with backend.name_scope(scope):
+        x = layers.ZeroPadding2D(padding=((2, 2), (2, 2)))(inputs)
+        x = layers.Conv2D(64, 5, strides=2, use_bias=False, name='conv1/conv')(x)
+        
+        x_list = []
+        for i in range(len(blocks) - 1):
+            x = dense_block(x, blocks[i], name='conv%d' % (i + 2))
+            x_list.append(x)
+            x = transition_block(x, 0.5, name='pool%d' % (i + 2))
+        x = dense_block(x, blocks[-1], name='conv%d' % (len(blocks) - 1 + 2))
+        x_list.append(x)
+        
+        bn_axis = 3  # image data format: channels_last
+        features_list = []
+        for i, x in enumerate(x_list[-3:]):
+            x = layers.BatchNormalization(axis=bn_axis, epsilon=1.001e-5,
+                                          name='post_bn_%d'%i)(x)
+            feat = layers.Activation('relu', name='post_relu_%d'%i)(x)
+            features_list.append(feat)
+        
+    return features_list

@@ -6,7 +6,7 @@ import numpy as np
 from PIL import Image
 from tensorflow.keras import backend
 
-from recognition_crnn.crnn import CRNN
+from recognition_crnn.model import CRNN
 from recognition_crnn.util import resize_text_image
 from recognition_crnn.util import sparse_tensor_to_list
 
@@ -15,13 +15,13 @@ from config import CRNN_CKPT_DIR
 from utils import ID2CHAR_DICT
 
 
-def predict(imgs_dir, type, model_epoch, model_type="horizontal", model_struc="resnet_lstm"):
+def predict(imgs_dir, model_epoch, model_type="horizontal", model_struc="resnet_lstm"):
     backend.set_learning_phase(False)
     
     crnn = CRNN(model_type=model_type, model_struc=model_struc)
     model = crnn.model_for_predicting()
     
-    weights_prefix = os.path.join(CRNN_CKPT_DIR, model_type + model_struc + "_crnn_weights_%05d_" % model_epoch)
+    weights_prefix = os.path.join(CRNN_CKPT_DIR, "vertical_densenet_gru_crnn_weights_00003_162.33.tf")
     model.load_weights(filepath=weights_prefix)
     
     for file in os.listdir(imgs_dir):
@@ -29,13 +29,15 @@ def predict(imgs_dir, type, model_epoch, model_type="horizontal", model_struc="r
             img_path = os.path.join(imgs_dir, file)
             PIL_img = Image.open(img_path)
             PIL_img = PIL_img if PIL_img.mode == "L" else PIL_img.convert("L")
-            PIL_img = resize_text_image(PIL_img, obj_size=TEXT_LINE_SIZE, type=type)
+            PIL_img = resize_text_image(PIL_img, obj_size=TEXT_LINE_SIZE, type=model_type)
             np_img = np.asarray(PIL_img)
             
             batch_imgs = np_img[np.newaxis, :, :, np.newaxis]
-            img_len_ratio = np.array([1.0], dtype=np.float32)
+            img_len = np_img.shape[2] if model_type in ("h", "horizontal") else np_img.shape[1]
+            img_len = np.array([img_len], dtype=np.int32)
 
-            np_indices, np_values = model.predict(x=[batch_imgs, img_len_ratio])
+            np_indices, np_values = model.predict(x=[batch_imgs, img_len])
+            print(np_indices, np_values)
             
             batch_labels = sparse_tensor_to_list(np_indices, np_values)
             labels = batch_labels[0]
@@ -45,6 +47,5 @@ def predict(imgs_dir, type, model_epoch, model_type="horizontal", model_struc="r
             
 
 if __name__ == '__main__':
-    predict()
     
     print("Done !")

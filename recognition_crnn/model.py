@@ -4,9 +4,9 @@
 import tensorflow as tf
 from tensorflow.keras import backend, layers, models
 
-from networks.resnet import ResNet151V2_for_crnn    # size to 1/8
-from networks.resnext import ResNeXt151_for_crnn    # size to 1/8
-from networks.densenet import DenseNet112_for_crnn  # size to 1/8
+from networks.resnet import ResNet58V2_for_crnn as ResNet_for_crnn      # size to 1/8
+from networks.resnext import ResNeXt58_for_crnn as ResNeXt_for_crnn     # size to 1/8
+from networks.densenet import DenseNet53_for_crnn as DenseNet_for_crnn  # size to 1/8
 
 from utils import NUM_CHARS
 from config import TEXT_LINE_SIZE
@@ -58,8 +58,9 @@ class CRNN(object):
         
         return loss
         
-    def ctc_decode(self, logits, logit_len, greedy=False, beam_size=5):
-    
+    def ctc_decode(self, args_list, greedy = False, beam_size = 5):
+        logits, logit_len = args_list
+        
         # Permute dimensions for ctc decoding
         logits = backend.permute_dimensions(logits, (1, 0, 2))
     
@@ -98,18 +99,18 @@ class CRNN(object):
     def model_for_predicting(self):
         
         crnn_body = self.crnn()
-    
-        batch_imgs = crnn_body.inputs
-        logits = crnn_body.outputs
 
-        img_len_ratio = layers.Input(shape=[], dtype="float32")
-        
-        max_length = backend.shape(logits)[1]
-        logit_len = backend.cast(backend.round(img_len_ratio * max_length), "int32")
+        batch_imgs = crnn_body.inputs[0]
+        logits = crnn_body.outputs[0]
 
-        sp_indices, sp_values = self.ctc_decode(logits, logit_len, beam_size=5)
+        img_len = layers.Input(shape=[], dtype="int32")
+
+        logit_len = backend.cast(backend.round(img_len / 8), dtype="int32")
+
+        sp_indices, sp_values = layers.Lambda(self.ctc_decode, name="ctc_decoding")([logits, logit_len])
         
-        crnn_model = models.Model(inputs=[batch_imgs, img_len_ratio],
+        
+        crnn_model = models.Model(inputs=[batch_imgs, img_len],
                                   outputs=[sp_indices, sp_values], name="crnn_model")
         
         return crnn_model
@@ -119,11 +120,11 @@ def CNN(inputs, scope="densenet"):
     """cnn of crnn."""
     
     if "resnet" in scope:
-        outputs = ResNet151V2_for_crnn(inputs, scope)  # 1/8 size
+        outputs = ResNet_for_crnn(inputs, scope)  # 1/8 size
     elif "resnext" in scope:
-        outputs = ResNeXt151_for_crnn(inputs, scope)   # 1/8 size
+        outputs = ResNeXt_for_crnn(inputs, scope)   # 1/8 size
     elif "densenet" in scope:
-        outputs = DenseNet112_for_crnn(inputs, scope)  # 1/8 size
+        outputs = DenseNet_for_crnn(inputs, scope)  # 1/8 size
     else:
         ValueError("Optional CNN scope: 'resnet*', 'resnext*', 'densenet*'.")
     

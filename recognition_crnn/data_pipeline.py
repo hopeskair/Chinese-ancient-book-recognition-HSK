@@ -17,7 +17,10 @@ from config import TEXT_LINE_SIZE
 from config import BATCH_SIZE_TEXT_LINE
 
 
-def load_text_lines_batch(tags_file_list, queue, batch_size=BATCH_SIZE_TEXT_LINE):
+TAGS_FILE_LIST = [(CRNN_TEXT_LINE_TAGS_FILE_H, "horizontal"), (CRNN_TEXT_LINE_TAGS_FILE_V, "vertical")]
+
+
+def load_text_lines_batch(tags_file_list=TAGS_FILE_LIST, type="horizontal", batch_size=BATCH_SIZE_TEXT_LINE):
     img_label_list = []
     while True:
         for tags_file, text_type in tags_file_list:
@@ -32,16 +35,16 @@ def load_text_lines_batch(tags_file_list, queue, batch_size=BATCH_SIZE_TEXT_LINE
                     PIL_img = PIL_img if PIL_img.mode == "L" else PIL_img.convert("L")
                     PIL_img = resize_text_image(PIL_img, obj_size=TEXT_LINE_SIZE, type=type)
                     np_img = np.asarray(PIL_img)
-                    multiple_imgs = [(np_img, ids_list)] * 3
+                    multiple_imgs = [(np_img, ids_list)] # * 3
                     img_label_list.extend(multiple_imgs)
                     
-                    if len(img_label_list) > 100:
+                    if len(img_label_list) > 1000:
                         random.shuffle(img_label_list)
-                        while len(img_label_list) > 50:
-                            queue.put(pack_text_lines(img_label_list, batch_size, type, "white"))
+                        while len(img_label_list) > 500:
+                            yield pack_text_lines(img_label_list, batch_size, type, "white")
 
 
-def create_text_lines_batch(queue, type="horizontal", batch_size=BATCH_SIZE_TEXT_LINE):
+def create_text_lines_batch(type="horizontal", batch_size=BATCH_SIZE_TEXT_LINE):
     img_label_list = []
     while True:
         random_size = random.randint(5*TEXT_LINE_SIZE, 20*TEXT_LINE_SIZE)
@@ -51,13 +54,13 @@ def create_text_lines_batch(queue, type="horizontal", batch_size=BATCH_SIZE_TEXT
         
         np_img = np.asarray(PIL_text)
         ids_list = [CHAR2ID_DICT[char] for char, box in chinese_char_and_box_list]
-        multiple_imgs = [(np_img, ids_list)] * 2
+        multiple_imgs = [(np_img, ids_list)] * 3
         img_label_list.extend(multiple_imgs)
 
-        if len(img_label_list) > 100:
+        if len(img_label_list) > 1000:
             random.shuffle(img_label_list)
-            while len(img_label_list) > 50:
-                queue.put(pack_text_lines(img_label_list, batch_size, type, "white"))
+            while len(img_label_list) > 500:
+                yield pack_text_lines(img_label_list, batch_size, type, "white")
 
 
 def pack_text_lines(img_label_list, batch_size, type, background="white"):
@@ -101,31 +104,3 @@ def pack_text_lines(img_label_list, batch_size, type, background="white"):
     train_target = batch_labels
     
     return (train_inputs, train_target)
-
-
-def text_lines_batch_generator(method="create", type="horizontal", batch_size=BATCH_SIZE_TEXT_LINE):
-    queue = Queue()
-    
-    if method == "load":
-        batch_generator = load_text_lines_batch
-        args = (
-            [(CRNN_TEXT_LINE_TAGS_FILE_H, "horizontal"), (CRNN_TEXT_LINE_TAGS_FILE_V, "vertical")],
-            queue,
-            type,
-            batch_size
-        )
-    elif method == "create":
-        batch_generator = create_text_lines_batch
-        args = (
-            queue,
-            type,
-            batch_size
-        )
-    else:
-        ValueError("Optional generator method : 'load', 'create'.")
-
-    writer = Process(target=batch_generator, args=args)
-    writer.start()
-    
-    while True:
-        yield queue.get()

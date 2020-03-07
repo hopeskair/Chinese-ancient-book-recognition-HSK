@@ -44,9 +44,9 @@ def generate_text_line_imgs(obj_num=100, type="horizontal", text_shape=None):
     with open(text_line_tags_file, "w", encoding="utf-8") as fw:
         for i in range(obj_num):
             if text_shape is None and type == "h":
-                text_shape = (random.randint(36, 96), random.randint(360, 960))
+                text_shape = (random.randint(36, 72), random.randint(540, 960))
             if text_shape is None and type == "v":
-                text_shape = (random.randint(360, 960), random.randint(36, 96))
+                text_shape = (random.randint(540, 960), random.randint(36, 72))
             
             PIL_text, chinese_char_and_box_list = create_text_line(text_shape, type=type)
             
@@ -86,9 +86,9 @@ def generate_text_line_tfrecords(obj_num=100, type="horizontal", text_shape=None
         writer = random.choice(writers_list)
 
         if text_shape is None and type == "h":
-            text_shape = (random.randint(36, 96), random.randint(360, 960))
+            text_shape = (random.randint(36, 72), random.randint(540, 960))
         if text_shape is None and type == "v":
-            text_shape = (random.randint(360, 960), random.randint(36, 96))
+            text_shape = (random.randint(540, 960), random.randint(36, 72))
 
         PIL_text, chinese_char_and_box_list = create_text_line(text_shape, type=type)
 
@@ -351,7 +351,7 @@ def chinese_char_img_generator_using_font(img_size=96):
         count = 0
         for font_file in font_file_list:
             count += 1
-            # print("Char image generator: %d of %d" % (count, total))
+            print("Char image generator: %d of %d" % (count, total))
             
             random.shuffle(all_chinese_list)
             for chinese_char in all_chinese_list:
@@ -366,9 +366,9 @@ def chinese_char_img_generator_using_font(img_size=96):
                     continue
                 
                 if chinese_char in IMPORTANT_CHARS:
-                    PIL_images_list += [(chinese_char, bigger_PIL_img)] * random.randint(5, 8)
+                    PIL_images_list += [(chinese_char, bigger_PIL_img)] * random.randint(6, 10)
                 else:
-                    PIL_images_list += [(chinese_char, bigger_PIL_img)] * random.randint(2, 5)
+                    PIL_images_list += [(chinese_char, bigger_PIL_img)] * random.randint(3, 6)
 
                 if len(PIL_images_list) > 10000:
                     random.shuffle(PIL_images_list)
@@ -389,7 +389,7 @@ def chinese_char_img_generator_using_image():
         count = 0
         for font_type, image_paths_list in get_external_image_paths(root_dir=EXTERNEL_IMAGES_DIR):
             count += 1
-            # print("Char image generator: %d of %d" % (count, total))
+            print("Char image generator: %d of %d" % (count, total))
             
             for image_path in image_paths_list:
                 chinese_char = os.path.basename(image_path)[0]

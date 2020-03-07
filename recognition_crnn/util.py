@@ -40,7 +40,7 @@ def sparse_tensor_to_list(np_indices, np_values):
     batch_size = triad_list[-1][0] + 1
     batch_labels = [[] for _ in range(batch_size)]
     
-    for (row, col), label in triad_list:
+    for row, col, label in triad_list:
         batch_labels[row].append(label)
     
     return batch_labels

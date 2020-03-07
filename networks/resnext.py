@@ -67,15 +67,29 @@ def stack3(x, filters, blocks, stride1=2, groups=32, name=None):
     return x
 
 
-def ResNeXt151_for_crnn(inputs, scope="resnext"):
+def ResNeXt58_for_crnn(inputs, scope="resnext"):
     def stack_fn(x):
-        x = stack3(x, 64, 4, stride1=1, name='conv2')
-        x = stack3(x, 128, 12, name='conv3')
-        x = stack3(x, 256, 28, name='conv4')
-        x = stack3(x, 512, 6, name='conv5')
+        x = stack3(x, 128, 3, stride1=1, name='conv2')
+        x = stack3(x, 256, 8, name='conv3')
+        x = stack3(x, 512, 8, name='conv4')
+        # x = stack3(x, 1024, 6, name='conv5')
         return x
     
     with backend.name_scope(scope):
         outputs = ResNet(inputs, stack_fn, use_bias=False, block_preact=False)  # 1/8 size
     
     return outputs
+
+
+def ResNeXt76_for_yolo(inputs, scope="resnext"):
+    def stack_fn(x):
+        x = stack3(x, 128, 3, name='conv2')
+        x1 = stack3(x, 256, 8, name='conv3')    # 1/8 size
+        x2 = stack3(x1, 512, 8, name='conv4')   # 1/16 size
+        x3 = stack3(x2, 1024, 6, name='conv5')  # 1/32 size
+        return [x1, x2, x3]
+    
+    with backend.name_scope(scope):
+        features_list = ResNet(inputs, stack_fn, use_bias=False, block_preact=False)
+    
+    return features_list

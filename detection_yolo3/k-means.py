@@ -1,34 +1,34 @@
-#!/usr/bin/env python
 # -- coding: utf-8 --
-"""
-Copyright (c) 2018. All rights reserved.
-Created by C. L. Wang on 2018/8/2
-"""
-
-import matplotlib.pyplot as plt
-import seaborn as sns
-
-sns.set()  # for plot styling
+# Author: hushukai
 
 from sklearn.cluster import KMeans
-from sklearn.datasets._samples_generator import make_blobs
+import numpy as np
+
+from config import YOLO3_BOOK_PAGE_TAGS_FILE
+from config import YOLO3_ANCHORS_FILE
 
 
-def test_of_k_means():
-    # 创建测试点，X是数据，y是标签，X:(300,2), y:(300,)
-    X, y_true = make_blobs(n_samples=300, centers=9, cluster_std=0.60, random_state=0)
-    kmeans = KMeans(n_clusters=9)  # 将数据聚类
-    kmeans.fit(X)  # 数据X
-    y_kmeans = kmeans.predict(X)  # 预测
-
-    # 颜色范围viridis: https://matplotlib.org/examples/color/colormaps_reference.html
-    plt.scatter(X[:, 0], X[:, 1], c=y_kmeans, s=20, cmap='viridis')  # c是颜色，s是大小
-
-    centers = kmeans.cluster_centers_  # 聚类的中心
-    plt.scatter(centers[:, 0], centers[:, 1], c='black', s=40, alpha=0.5)  # 中心点为黑色
-
-    plt.show()  # 展示
+def get_anchors_with_kmeans(src_file, dest_file):
+    boxes_wh = []
+    with open(src_file, "r", encoding="utf-8") as fr:
+        for line in fr:
+            boxes = line.strip().split()[1:]
+            boxes = [list(map(int, box.split(",")[:4])) for box in boxes]
+            wh = [(x2-x1, y2-y1) for x1, y1, x2, y2 in boxes]
+            boxes_wh.extend(wh)
+    
+    boxes_wh = np.array(boxes_wh, dtype=np.float32)
+    kmeans = KMeans(n_clusters=9)
+    kmeans.fit(boxes_wh)
+    
+    anchors = np.round(kmeans.cluster_centers_).astype(dtype=np.int32)
+    anchors = anchors.tolist()
+    anchors_str = ", ".join([str(w)+","+str(h) for w, h in anchors])
+    
+    with open(dest_file, "w", encoding="utf-8") as fw:
+        fw.write(anchors_str)
 
 
 if __name__ == '__main__':
-    test_of_k_means()
+    get_anchors_with_kmeans(src_file=YOLO3_BOOK_PAGE_TAGS_FILE, dest_file=YOLO3_ANCHORS_FILE)
+    print("Done !")

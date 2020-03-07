@@ -7,14 +7,10 @@ import os
 # ************************ basic configuration ***************************
 # os.getcwd() returns the current working directory
 CURR_DIR = os.path.dirname(__file__).replace("/", os.sep)
-CHINESE_LABEL_FILE = os.path.join(CURR_DIR, "chinese_labels", "chinese_labels_test.txt")
+CHINESE_LABEL_FILE = os.path.join(CURR_DIR, "chinese_labels", "chinese_labels_simplified_level1.txt")
 IGNORABLE_CHARS_FILE = os.path.join(CURR_DIR, "chinese_labels", "ignorable_chars.txt")
 IMPORTANT_CHARS_FILE = os.path.join(CURR_DIR, "chinese_labels", "important_chars.txt")
 # ************************ basic configuration ***************************
-
-
-LOG_DIR = os.path.join(CURR_DIR, "_log")
-CHECKPOINT_DIR = os.path.join(CURR_DIR, "_ckpt")
 
 
 # ************************ generate image data ***************************
@@ -60,8 +56,22 @@ CRNN_TEXT_LINE_TAGS_FILE_V = os.path.join(DATA_DIR, "text_lines", "text_lines_ta
 # *********************** data format conversion *************************
 
 
-# ***************************** Train ************************************
+# ***************************** Model ************************************
+VALIDATION_SPLIT = 0.1
+
+# book page detection
+BOX_CLASSES_ON_BOOK = ["text",]
+BATCH_SIZE_BOOK_PAGE = 2
+YOLO3_CLASS_SCORE_THRESH = 0.6
+YOLO3_NMS_IOU_THRESH = 0.45
+YOLO3_NMS_MAX_BOXES_NUM = 50
+YOLO3_ROOT_DIR = os.path.join(CURR_DIR, "detection_yolo3")
+YOLO3_CKPT_DIR = os.path.join(CURR_DIR, "detection_yolo3", "ckpt")
+YOLO3_LOGS_DIR = os.path.join(CURR_DIR, "detection_yolo3", "logs")
+YOLO3_ANCHORS_FILE = os.path.join(CURR_DIR, "detection_yolo3", "anchors_with_kmeans.txt")
+
 # text line recognition
-BATCH_SIZE_TEXT_LINE = 16
-CRNN_CKPT_DIR = os.path.join(DATA_DIR, "recognition_crnn", "ckpt")
+BATCH_SIZE_TEXT_LINE = 8
+CRNN_CKPT_DIR = os.path.join(CURR_DIR, "recognition_crnn", "ckpt")
+CRNN_LOGS_DIR = os.path.join(CURR_DIR, "recognition_crnn", "logs")
 # ***************************** Train ************************************
