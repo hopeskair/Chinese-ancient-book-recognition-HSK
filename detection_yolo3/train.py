@@ -5,20 +5,20 @@ import os
 import tensorflow as tf
 from tensorflow.keras import backend, layers, models, optimizers, callbacks
 
-from detection_yolo3.util import get_anchors, draw_boxes
-from detection_yolo3.model import yolo_body, yolo_loss, yolo_eval
-from detection_yolo3.data_pipeline import data_generator
+from .utils import get_anchors, draw_boxes
+from .model import yolo_body, yolo_loss, yolo_eval
+from .data_pipeline import data_generator
 
-from utils import check_or_makedirs
-from config import YOLO3_BOOK_PAGE_TAGS_FILE, VALIDATION_SPLIT
-from config import BATCH_SIZE_BOOK_PAGE
-from config import BOX_CLASSES_ON_BOOK, YOLO3_ANCHORS_FILE
-from config import YOLO3_CKPT_DIR, YOLO3_LOGS_DIR
-from config import YOLO3_CLASS_SCORE_THRESH, YOLO3_NMS_IOU_THRESH
-from config import YOLO3_NMS_MAX_BOXES_NUM
+from ..util import check_or_makedirs
+from ..config import YOLO3_BOOK_PAGE_TAGS_FILE, VALIDATION_SPLIT
+from ..config import BATCH_SIZE_BOOK_PAGE
+from ..config import BOX_CLASSES_ON_BOOK, YOLO3_ANCHORS_FILE
+from ..config import YOLO3_CKPT_DIR, YOLO3_LOGS_DIR
+from ..config import YOLO3_CLASS_SCORE_THRESH, YOLO3_NMS_IOU_THRESH
+from ..config import YOLO3_NMS_MAX_BOXES_NUM
 
 
-def train(data_file, src_type, model_struc="densenet", pretrained_path="", freeze_body=False):
+def train(data_file, src_type, model_struc="densenet", weigths_path="", freeze_body=False):
     check_or_makedirs(YOLO3_LOGS_DIR)
     check_or_makedirs(YOLO3_CKPT_DIR)
     backend.set_learning_phase(True)
@@ -28,10 +28,10 @@ def train(data_file, src_type, model_struc="densenet", pretrained_path="", freez
 
     summary_writer = tf.summary.create_file_writer(YOLO3_LOGS_DIR)
     with summary_writer.as_default():
-        load_pretrained = True if os.path.exists(pretrained_path) else False
+        load_pretrained = True if os.path.exists(weigths_path) else False
         model = create_model(anchors, num_classes, model_struc,
                              load_pretrained=load_pretrained,
-                             weights_path=pretrained_path,
+                             weights_path=weigths_path,
                              freeze_body=freeze_body)  # make sure you know what you freeze
         summary_writer.flush()
     

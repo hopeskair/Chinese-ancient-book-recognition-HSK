@@ -7,12 +7,12 @@ from PIL import Image
 from tensorflow.keras import backend
 
 from recognition_crnn.model import CRNN
-from recognition_crnn.util import resize_text_image
-from recognition_crnn.util import sparse_tensor_to_list
+from recognition_crnn.utils import resize_text_image
+from recognition_crnn.utils import sparse_tensor_to_list
 
 from config import TEXT_LINE_SIZE
 from config import CRNN_CKPT_DIR
-from utils import ID2CHAR_DICT
+from util import ID2CHAR_DICT
 
 
 def predict(imgs_dir, model_epoch, model_type="horizontal", model_struc="resnet_lstm"):

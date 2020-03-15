@@ -17,11 +17,11 @@ def CNN(inputs, scope="densenet"):
     """cnn for YOLO_V3"""
     
     if "resnet" in scope:
-        features_list = ResNet_for_yolo(inputs, scope)  # 1/8 size
+        features_list = ResNet_for_yolo(inputs, scope)   # 1/8, 1/16, 1/32 size
     elif "resnext" in scope:
-        features_list = ResNeXt_for_yolo(inputs, scope)  # 1/8 size
+        features_list = ResNeXt_for_yolo(inputs, scope)  # 1/8, 1/16, 1/32 size
     elif "densenet" in scope:
-        features_list = DenseNet_for_yolo(inputs, scope)  # 1/8 size
+        features_list = DenseNet_for_yolo(inputs, scope) # 1/8, 1/16, 1/32 size
     else:
         ValueError("Optional CNN scope: 'resnet*', 'resnext*', 'densenet*'.")
     

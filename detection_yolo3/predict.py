@@ -8,9 +8,9 @@ from PIL import Image
 from tensorflow.keras import backend, layers, models
 
 from detection_yolo3.model import yolo_eval, yolo_body
-from detection_yolo3.util import get_anchors, draw_boxes
+from detection_yolo3.utils import get_anchors, draw_boxes
 
-from utils import check_or_makedirs
+from util import check_or_makedirs
 from config import BOX_CLASSES_ON_BOOK
 from config import YOLO3_ANCHORS_FILE
 from config import YOLO3_CLASS_SCORE_THRESH

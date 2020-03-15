@@ -14,7 +14,7 @@ from config import BOOK_PAGE_IMGS_H, BOOK_PAGE_TAGS_FILE_H
 from config import BOOK_PAGE_IMGS_V, BOOK_PAGE_TAGS_FILE_V
 from config import BOOK_PAGE_TFRECORDS_H, BOOK_PAGE_TFRECORDS_V
 
-from utils import check_or_makedirs
+from util import check_or_makedirs
 from data_generator.img_utils import reverse_image_color
 from data_generator.generate_text_lines import generate_one_row_chars, generate_two_rows_chars
 from data_generator.generate_text_lines import generate_one_col_chars, generate_two_cols_chars

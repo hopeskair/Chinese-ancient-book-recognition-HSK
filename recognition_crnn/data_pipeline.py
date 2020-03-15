@@ -7,11 +7,11 @@ import numpy as np
 from PIL import Image
 from multiprocessing import Queue, Process
 
-from recognition_crnn.util import resize_text_image
-from recognition_crnn.util import dense_tensor_from_list
+from recognition_crnn.utils import resize_text_image
+from recognition_crnn.utils import dense_tensor_from_list
 from data_generator.generate_text_lines import create_text_line
 
-from utils import CHAR2ID_DICT
+from util import CHAR2ID_DICT
 from config import CRNN_TEXT_LINE_TAGS_FILE_H, CRNN_TEXT_LINE_TAGS_FILE_V
 from config import TEXT_LINE_SIZE
 from config import BATCH_SIZE_TEXT_LINE

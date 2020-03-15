@@ -14,9 +14,9 @@ from config import TEXT_LINE_IMGS_H, TEXT_LINE_TAGS_FILE_H
 from config import TEXT_LINE_IMGS_V, TEXT_LINE_TAGS_FILE_V
 from config import TEXT_LINE_TFRECORDS_H, TEXT_LINE_TFRECORDS_V
 from config import FONT_FILE_DIR, EXTERNEL_IMAGES_DIR, MAX_ROTATE_ANGLE
-from utils import CHAR2ID_DICT, IGNORABLE_CHARS, IMPORTANT_CHARS
+from util import CHAR2ID_DICT, IGNORABLE_CHARS, IMPORTANT_CHARS
 
-from utils import check_or_makedirs
+from util import check_or_makedirs
 from data_generator.img_utils import rotate_PIL_image
 from data_generator.img_utils import find_min_bound_box
 from data_generator.img_utils import adjust_img_and_put_into_background

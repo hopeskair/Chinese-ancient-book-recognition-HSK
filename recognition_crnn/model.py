@@ -8,8 +8,43 @@ from networks.resnet import ResNet58V2_for_crnn as ResNet_for_crnn      # size t
 from networks.resnext import ResNeXt58_for_crnn as ResNeXt_for_crnn     # size to 1/8
 from networks.densenet import DenseNet53_for_crnn as DenseNet_for_crnn  # size to 1/8
 
-from utils import NUM_CHARS
+from util import NUM_CHARS
 from config import TEXT_LINE_SIZE
+
+
+def CNN(inputs, scope="densenet"):
+    """cnn of crnn."""
+    
+    if "resnet" in scope:
+        outputs = ResNet_for_crnn(inputs, scope)  # 1/8 size
+    elif "resnext" in scope:
+        outputs = ResNeXt_for_crnn(inputs, scope)  # 1/8 size
+    elif "densenet" in scope:
+        outputs = DenseNet_for_crnn(inputs, scope)  # 1/8 size
+    else:
+        ValueError("Optional CNN scope: 'resnet*', 'resnext*', 'densenet*'.")
+    
+    return outputs
+
+
+def Bidirectional_RNN(inputs, scope="gru"):
+    """Bidirectional RNN of crnn."""
+    
+    if "lstm" in scope:
+        rnn_layer = layers.LSTM
+    elif "gru" in scope:
+        rnn_layer = layers.GRU
+    else:
+        ValueError("Optional RNN layer: '*lstm', '*gru'.")
+    
+    with backend.name_scope(scope):
+        # Based on available runtime hardware, this layer will choose different
+        # implementations (pure-tf or cudnn-based).
+        outputs = layers.Bidirectional(rnn_layer(units=1024, dropout=0.2, return_sequences=True),
+                                       merge_mode="concat",
+                                       )(inputs)
+    
+    return outputs
 
 
 class CRNN(object):
@@ -114,38 +149,3 @@ class CRNN(object):
                                   outputs=[sp_indices, sp_values], name="crnn_model")
         
         return crnn_model
-        
-
-def CNN(inputs, scope="densenet"):
-    """cnn of crnn."""
-    
-    if "resnet" in scope:
-        outputs = ResNet_for_crnn(inputs, scope)  # 1/8 size
-    elif "resnext" in scope:
-        outputs = ResNeXt_for_crnn(inputs, scope)   # 1/8 size
-    elif "densenet" in scope:
-        outputs = DenseNet_for_crnn(inputs, scope)  # 1/8 size
-    else:
-        ValueError("Optional CNN scope: 'resnet*', 'resnext*', 'densenet*'.")
-    
-    return outputs
-
-
-def Bidirectional_RNN(inputs, scope="gru"):
-    """Bidirectional RNN of crnn."""
-    
-    if "lstm" in scope:
-        rnn_layer = layers.LSTM
-    elif "gru" in scope:
-        rnn_layer = layers.GRU
-    else:
-        ValueError("Optional RNN layer: '*lstm', '*gru'.")
-    
-    with backend.name_scope(scope):
-        # Based on available runtime hardware, this layer will choose different
-        # implementations (pure-tf or cudnn-based).
-        outputs = layers.Bidirectional(rnn_layer(units=1024, dropout=0.2, return_sequences=True),
-                                       merge_mode="concat",
-                                       )(inputs)
-    
-    return outputs

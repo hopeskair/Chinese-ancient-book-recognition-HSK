@@ -104,6 +104,12 @@ def DenseNet53_for_crnn(inputs, scope="densenet"):
     return outputs
 
 
+def DenseNet60_for_ctpn(inputs, scope="densenet"):
+    with backend.name_scope(scope):
+        outputs = DenseNet(inputs, blocks=[3, 9, 8, 8])  # 1/16 size
+    return outputs
+
+
 def DenseNet73_for_yolo(inputs, scope="densenet"):
     blocks = [3, 9, 8, 8, 6]
     

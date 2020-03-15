@@ -9,7 +9,7 @@ from recognition_crnn.data_pipeline import create_text_lines_batch
 from recognition_crnn.data_pipeline import load_text_lines_batch
 
 from config import CRNN_CKPT_DIR, BATCH_SIZE_TEXT_LINE
-from utils import check_or_makedirs
+from util import check_or_makedirs
 
 
 def train(num_epochs, start_epoch=0, model_type="horizontal", model_struc="resnet_lstm"):

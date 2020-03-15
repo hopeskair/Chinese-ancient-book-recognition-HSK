@@ -9,12 +9,12 @@ from PIL import Image
 import numpy as np
 import tensorflow as tf
 
-from utils import CHAR2ID_DICT, BLANK_CHAR
+from util import CHAR2ID_DICT, BLANK_CHAR
 from config import CHAR_IMG_SIZE, NUM_IMAGES_PER_FONT
 from config import FONT_FILE_DIR, FONT_FINISHED_DIR, EXTERNEL_IMAGES_DIR
 from config import CHAR_IMGS_DIR, CHAR_TFRECORDS_DIR
 
-from utils import check_or_makedirs, remove_then_makedirs
+from util import check_or_makedirs, remove_then_makedirs
 from data_generator.img_utils import get_standard_image, get_augmented_image
 from data_generator.img_utils import generate_bigger_image_by_font, load_external_image_bigger
 

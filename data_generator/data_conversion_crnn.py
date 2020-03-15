@@ -7,7 +7,7 @@ import json
 from config import TEXT_LINE_TAGS_FILE_H, TEXT_LINE_IMGS_H
 from config import TEXT_LINE_TAGS_FILE_V, TEXT_LINE_IMGS_V
 from config import CRNN_TEXT_LINE_TAGS_FILE_H, CRNN_TEXT_LINE_TAGS_FILE_V
-from utils import CHAR2ID_DICT
+from util import CHAR2ID_DICT
 
 
 def convert_annotation(src_list, dest_file):
