@@ -18,11 +18,12 @@ def pad_to_fixed_size(input_np, fixed_size):
     :return:
     """
     shape = input_np.shape
-    # 增加tag
-    np_array = np.pad(input_np, ((0, 0), (0, 1)), mode='constant', constant_values=1)
-    # 增加padding
+    np_array = np.pad(input_np, ((0, 0), (0, 1)), mode='constant', constant_values=1)   # 增加tag
+    
     pad_num = max(0, fixed_size - shape[0])
-    return np.pad(np_array, ((0, pad_num), (0, 0)), mode='constant', constant_values=0)
+    x = np.pad(np_array, ((0, pad_num), (0, 0)), mode='constant', constant_values=0)    # 增加padding
+    
+    return x[:fixed_size]
 
 
 def remove_pad(input_np):

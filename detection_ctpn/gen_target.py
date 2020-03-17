@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 # Author: hushukai
 
-from tensorflow.keras import layers
+import random
 import tensorflow as tf
+from tensorflow.keras import layers
 
-from detection_ctpn.utils.tf_utils import remove_pad, pad_to_fixed_size
+from detection_ctpn.utils import tf_utils
+
+from config import CTPN_POS_ANCHOR_IOU, CTPN_NEG_ANCHOR_IOU
 
 
 def compute_iou(gt_boxes, anchors):
@@ -59,7 +62,7 @@ def ctpn_regress_target(anchors, gt_boxes):
 
     # 计算回归目标
     dy = (gt_center_y - center_y) / h
-    dh = tf.log(gt_h / h)
+    dh = tf.math.log(gt_h / h)
     
     dx = side_regress_target(anchors, gt_boxes)  # 侧边改善
     regress_target = tf.stack([dy, dh, dx], axis=1)
@@ -80,7 +83,11 @@ def side_regress_target(anchors, gt_boxes):
     center_x = (anchors[:, 0] + anchors[:, 2]) * 0.5
     gt_center_x = (gt_boxes[:, 0] + gt_boxes[:, 2]) * 0.5
     
-    # 侧边框移动到gt的侧边，相当于中心点偏移的两倍;不是侧边的anchor 偏移为0. ???
+    # 解释：整张图片被均匀地划分为width=16的网格
+    # 生成的anchor与这些网格在宽度方向完全一致，原gt划分的子gt与这些网格在宽度方向也完全一致
+    # 非边缘的anchor和子gt中心偏移必然为0
+    # 边缘anchor的width=16，子gt的width<16,两者有一个侧边是重合的，另一侧边的距离是中心距离的2倍
+    # 因此，在边缘处对齐anchor和子gt，需要移动两倍的中心点偏移；不是侧边的anchor，偏移为0，不需移动
     dx = (gt_center_x - center_x) * 2 / w
     
     return dx
@@ -94,24 +101,24 @@ def ctpn_target(gt_boxes, valid_anchors, valid_indices, train_anchors_num=256, p
     Note: gt_boxes shape [gt_num, ( x1, y1, x2, y2, class_id, padding_flag)]
     """
     # 获取真正的GT,去除标签位
-    gt_boxes = remove_pad(gt_boxes)
+    gt_boxes = tf_utils.remove_pad(gt_boxes)
     gt_boxes, gt_cls = gt_boxes[:,:4], gt_boxes[:,4]
-    gt_cls = tf.ones_like(gt_cls) # fg:1
+    gt_cls = tf.cast(gt_cls, dtype=tf.int32) # fg:1
     
     gt_num = tf.shape(gt_boxes)[0]
     
     # 计算iou值
     iou = compute_iou(gt_boxes, valid_anchors)
 
-    # 每个anchor与所有gt_box最大的iou, iou>0.7时为正样本
-    anchors_iou_max = tf.reduce_max(iou, axis=0, keep_dims=True)
-    anchors_iou_max = tf.where(tf.greater_equal(anchors_iou_max, 0.7), anchors_iou_max, -1)
+    # 每个anchor与所有gt_box最大的iou, iou阈值时为正样本
+    anchors_iou_max = tf.reduce_max(iou, axis=0, keepdims=True)
+    anchors_iou_max = tf.where(tf.greater_equal(anchors_iou_max, CTPN_POS_ANCHOR_IOU), anchors_iou_max, -1)
     anchors_iou_max_bool = tf.equal(iou, anchors_iou_max)
     
-    anchors_no_goal = tf.where(tf.less(anchors_iou_max, 0.7), True, False)
+    anchors_no_goal = tf.where(tf.less(anchors_iou_max, CTPN_POS_ANCHOR_IOU), True, False)
     
     # 与gt_box iou最大的anchor是正样本(可能有多个)
-    gt_iou_max = tf.reduce_max(iou, axis=1, keep_dims=True)
+    gt_iou_max = tf.reduce_max(iou, axis=1, keepdims=True)
     gt_iou_max_bool = tf.equal(iou, gt_iou_max)
     
     gt_iou_max_bool = tf.logical_and(gt_iou_max_bool, anchors_no_goal)
@@ -119,16 +126,16 @@ def ctpn_target(gt_boxes, valid_anchors, valid_indices, train_anchors_num=256, p
     # 合并两部分正样本索引
     positive_bool_matrix = tf.logical_or(anchors_iou_max_bool, gt_iou_max_bool)
     
-    # 获取iou值用于度量, 用作度量的必须是浮点类型
-    gt_match_min_iou = tf.reduce_min(tf.boolean_mask(iou, positive_bool_matrix))    # 标量
-    gt_match_mean_iou = tf.reduce_mean(tf.boolean_mask(iou, positive_bool_matrix))  # 标量
+    # 获取iou值用于度量
+    gt_match_min_iou = tf.reduce_min(tf.boolean_mask(iou, positive_bool_matrix))
+    gt_match_mean_iou = tf.reduce_mean(tf.boolean_mask(iou, positive_bool_matrix))
     
     # 正样本索引
     positive_indices = tf.where(positive_bool_matrix)  # [positive_num, (gt索引号, anchor索引号)]
     
     # 采样正样本
     positive_num = tf.minimum(tf.shape(positive_indices)[0], int(train_anchors_num * positive_ratio))
-    positive_indices = tf.random_shuffle(positive_indices)[:positive_num]
+    positive_indices = tf.random.shuffle(positive_indices)[:positive_num]
     
     # 获取正样本anchor和对应的gt_box
     positive_gt_indices = positive_indices[:, 0]
@@ -142,17 +149,17 @@ def ctpn_target(gt_boxes, valid_anchors, valid_indices, train_anchors_num=256, p
     deltas = ctpn_regress_target(positive_anchors, positive_gt_boxes)
     
     # 获取负样本 iou < 0.5
-    negative_bool = tf.less(tf.reduce_max(iou, axis=0), 0.5)
+    negative_bool = tf.less(tf.reduce_max(iou, axis=0), CTPN_NEG_ANCHOR_IOU)
     positive_bool = tf.reduce_any(positive_bool_matrix, axis=0)
     negative_bool = tf.logical_and(negative_bool, tf.logical_not(positive_bool))
 
     # 采样负样本
     negative_indices = tf.where(negative_bool)  # [negative_num, (anchor索引号)]
     negative_num = tf.minimum(tf.shape(negative_indices)[0], train_anchors_num - positive_num)
-    negative_indices = tf.random_shuffle(negative_indices[:, 0])[:negative_num]
+    negative_indices = tf.random.shuffle(negative_indices[:, 0])[:negative_num]
 
-    negative_gt_cls = tf.zeros([negative_num])  # bg:0
-    negative_deltas = tf.zeros([negative_num, 3])
+    negative_gt_cls = tf.zeros([negative_num], dtype=tf.int32)  # bg:0
+    negative_deltas = tf.zeros([negative_num, 3], dtype=tf.float32)
 
     # 合并正负样本
     deltas = tf.concat([deltas, negative_deltas], axis=0, name='ctpn_target_deltas')
@@ -161,26 +168,25 @@ def ctpn_target(gt_boxes, valid_anchors, valid_indices, train_anchors_num=256, p
     anchor_indices_sampled = tf.gather(valid_indices, anchor_indices_sampled)  # 对应到全局索引
     
     # padding
-    deltas = pad_to_fixed_size(deltas, train_anchors_num)
-    class_ids = pad_to_fixed_size(tf.expand_dims(class_ids, 1), train_anchors_num)
-    anchor_indices_sampled = pad_to_fixed_size(tf.expand_dims(anchor_indices_sampled, 1), train_anchors_num)
-
+    deltas = tf_utils.pad_to_fixed_size(deltas, train_anchors_num)
+    class_ids = tf_utils.pad_to_fixed_size(tf.expand_dims(class_ids, 1), train_anchors_num)
+    anchor_indices_sampled = tf_utils.pad_to_fixed_size(tf.expand_dims(anchor_indices_sampled, 1), train_anchors_num)
+    
     # 用作度量的必须是浮点类型
     return [deltas, class_ids, anchor_indices_sampled,
             tf.cast(gt_num, dtype=tf.float32),
             tf.cast(positive_num, dtype=tf.float32),
             tf.cast(negative_num, dtype=tf.float32),
-            gt_match_min_iou,
-            gt_match_mean_iou]
+            gt_match_min_iou, gt_match_mean_iou]
 
 
 class CtpnTarget(layers.Layer):
-    def __init__(self, train_anchors_num=256, positive_ratio=0.5, **kwargs):
+    def __init__(self, train_anchors_num=512, positive_ratio=0.5, **kwargs):
         self.train_anchors_num = train_anchors_num
         self.positive_ratio = positive_ratio
         super(CtpnTarget, self).__init__(**kwargs)
 
-    def __call__(self, inputs, **kwargs):
+    def call(self, inputs, **kwargs):
         """
         parameter: inputs
             gt_boxes: [batch_size, num_gt_boxes,( x1, y1, x2, y2, class_id, padding_flag)]
@@ -188,16 +194,15 @@ class CtpnTarget(layers.Layer):
             valid_indices: [anchor_num]
         """
         gt_boxes, valid_anchors, valid_indices = inputs
-        
-        options = {"valid_anchors": valid_anchors,
-                   "valid_indices": valid_indices,
+
+        options = {"valid_anchors":valid_anchors,
+                   "valid_indices":valid_indices,
                    "train_anchors_num": self.train_anchors_num,
                    "positive_ratio": self.positive_ratio}
-        
         outputs = tf.map_fn(fn=lambda i_gt_boxes: ctpn_target(i_gt_boxes, **options),
                             elems=gt_boxes,
-                            dtype=tf.float32)
-        
+                            dtype=[tf.float32, tf.int32, tf.int64] + [tf.float32]*5,
+                            name="loop_ctpn_target")
         return outputs
     
     def compute_output_shape(self, input_shape):

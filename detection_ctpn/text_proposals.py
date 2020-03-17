@@ -87,14 +87,14 @@ def nms(boxes, scores, class_logits, max_outputs=2000, iou_thresh=0.5, score_thr
 
 class TextProposal(layers.Layer):
     """生成候选框"""
-    def __init__(self, nms_max_outputs=2000, cls_score_thresh=0.7, iou_thresh=0.3, use_side_refine=False, **kwargs):
+    def __init__(self, nms_max_outputs=1024, cls_score_thresh=0.7, iou_thresh=0.3, use_side_refine=False, **kwargs):
         self.nms_max_outputs = nms_max_outputs
         self.cls_score_thresh = cls_score_thresh
         self.iou_thresh = iou_thresh
         self.use_side_refine = use_side_refine
         super(TextProposal, self).__init__(**kwargs)
 
-    def __call__(self, inputs, **kwargs):
+    def call(self, inputs, **kwargs):
         """用回归值生成边框，并使用nms筛选
         Parameter: inputs:
             deltas: [batch_size, N, (dy,dh)],  N是所有的anchors数量

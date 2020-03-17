@@ -43,7 +43,7 @@ def generate_book_pages(obj_num=10, type="horizontal", page_shape=None):
                 page_shape = (random.randint(720, 1080), random.randint(480, 720))
 
             PIL_page, text_bbox_list = create_book_page(page_shape, type=type)
-            PIL_page = PIL_page.convert("RGB")
+            PIL_page = PIL_page.convert("L")
             
             img_name = "book_page_%d.jpg" % i
             save_path = os.path.join(book_page_imgs_dir, img_name)
@@ -55,7 +55,7 @@ def generate_book_pages(obj_num=10, type="horizontal", page_shape=None):
                 sys.stdout.flush()
 
 
-def generate_book_page_tfrecords(obj_num=10, type="horizontal", page_shape=None):
+def generate_book_page_tfrecords(obj_num=10, type="horizontal", init_num=0, page_shape=None):
     if type.lower() in ("h", "horizontal"):
         type = "h"
     elif type.lower() in ("v", "vertical"):
@@ -69,12 +69,12 @@ def generate_book_page_tfrecords(obj_num=10, type="horizontal", page_shape=None)
         book_page_tfrecords_dir = BOOK_PAGE_TFRECORDS_V
     
     check_or_makedirs(book_page_tfrecords_dir)
-
+    
     # 我们可以把生成的图片直接存入tfrecords文件
     # 而不必将生成的图片先保存到磁盘，再从磁盘读取出来保存到tfrecords文件，这样效率太低
     writers_list = \
         [tf.io.TFRecordWriter(os.path.join(book_page_tfrecords_dir, "book_pages_%d.tfrecords" % i))
-         for i in range(20)]
+         for i in range(init_num, init_num+20)]
     
     # 保存生成的书页图片
     for i in range(obj_num):
@@ -85,7 +85,7 @@ def generate_book_page_tfrecords(obj_num=10, type="horizontal", page_shape=None)
             page_shape = (random.randint(720, 1080), random.randint(480, 720))
 
         PIL_page, text_bbox_list = create_book_page(page_shape, type=type)
-
+        
         bytes_image = PIL_page.tobytes()  # 将图片转化为原生bytes
         text_boxes = np.array([text_box for text_box in text_bbox_list], dtype=np.int32).tobytes()
 
@@ -142,7 +142,7 @@ def create_book_page(shape=(960, 540), type="horizontal"):
     if type == "h":  # 横向排列
         
         # 随机确定文本的行数
-        rows_num = random.randint(7, 9)
+        rows_num = random.randint(6, 10)
         row_h = (page_height - 2 * margin_h) / rows_num
 
         # y-coordinate划分行
@@ -242,25 +242,44 @@ def display_tfrecords(tfrecords_file):
     
     data_set = data_set.map(parse_func)
     
-    for features in data_set.take(1):
+    # for features in data_set.take(1):
+    #     img_h = features['img_height']
+    #     img_w = features['img_width']
+    #     image_raw = tf.io.decode_raw(features["bytes_image"], tf.uint8)
+    #
+    #     image = tf.reshape(image_raw, shape=[img_h, img_w])
+    #     PIL_img = Image.fromarray(image.numpy())
+    #     PIL_img.show()
+    #
+    #     text_boxes = tf.io.decode_raw(features["text_boxes"], tf.int32)
+    #     text_boxes = tf.reshape(text_boxes, shape=(-1, 4)).numpy()
+    #     print(text_boxes)
+    
+    def restore_func(features):
         img_h = features['img_height']
         img_w = features['img_width']
         image_raw = tf.io.decode_raw(features["bytes_image"], tf.uint8)
         image = tf.reshape(image_raw, shape=[img_h, img_w])
-        PIL_img = Image.fromarray(image.numpy())
-        PIL_img.show()
         
         text_boxes = tf.io.decode_raw(features["text_boxes"], tf.int32)
-        text_boxes = tf.reshape(text_boxes, shape=(-1, 4)).numpy()
+        text_boxes = tf.reshape(text_boxes, shape=(-1, 4))
+        return image, text_boxes
+    
+    data_set = data_set.map(restore_func)
+    
+    for i, (image, text_boxes) in enumerate(data_set.take(2)):
+        image, text_boxes = image.numpy(), text_boxes.numpy()
+        PIL_img = Image.fromarray(image)
+        # PIL_img.show()
         print(text_boxes)
-
+        
 
 if __name__ == '__main__':
-    generate_book_pages(obj_num=100, type="horizontal", page_shape=(416, 416))
-    generate_book_pages(obj_num=100, type="vertical", page_shape=(416, 416))
+    # generate_book_pages(obj_num=100, type="horizontal", page_shape=(416, 416))
+    # generate_book_pages(obj_num=100, type="vertical", page_shape=(416, 416))
     # generate_book_page_tfrecords(obj_num=100, type="horizontal")
-    # generate_book_page_tfrecords(obj_num=100, type="vertical")
+    # generate_book_page_tfrecords(obj_num=8000, type="vertical")
     
-    # display_tfrecords(os.path.join(BOOK_PAGE_TFRECORDS_V, "book_pages_0.tfrecords"))
+    display_tfrecords(os.path.join(BOOK_PAGE_TFRECORDS_V, "book_pages_0.tfrecords"))
     
     print("Done !")

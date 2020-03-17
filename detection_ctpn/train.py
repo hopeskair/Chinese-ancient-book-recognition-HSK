@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-
+import tensorflow as tf
 import os
 from tensorflow.keras import backend as K
 from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint, ReduceLROnPlateau
@@ -7,9 +7,9 @@ from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint, ReduceLROnP
 from .model import ctpn_net, compile, get_layer, add_metrics
 from .data_pipeline import data_generator
 
-from ..util import check_or_makedirs
-from ..config import CTPN_CKPT_DIR, CTPN_LOGS_DIR
-from ..config import BATCH_SIZE_BOOK_PAGE
+from util import check_or_makedirs
+from config import CTPN_CKPT_DIR, CTPN_LOGS_DIR
+from config import BATCH_SIZE_BOOK_PAGE
 
 
 def get_callbacks(model_struc="densenet_gru"):
@@ -37,24 +37,25 @@ def main(data_file, src_type, model_type, epochs, init_epochs=0, model_struc="de
     K.set_learning_phase(True)
     
     # 加载模型
-    ctpn_model = ctpn_net(stage="train", model_struc=model_struc)
-    compile(ctpn_model, loss_names=['ctpn_class_loss', 'ctpn_regress_loss'])
+    ctpn_model = ctpn_net(stage="train", batch_size=BATCH_SIZE_BOOK_PAGE, model_struc=model_struc)
+    compile(ctpn_model, loss_names=['ctpn_class_loss', 'ctpn_regress_loss', 'side_regress_loss'])
     
     # 增加度量
     output = get_layer(ctpn_model, 'ctpn_target').output
     add_metrics(ctpn_model, ['gt_num', 'pos_num', 'neg_num', 'gt_min_iou', 'gt_avg_iou'], output[-5:])
+    ctpn_model.summary()
     
     if os.path.exists(weights_path):
         ctpn_model.load_weights(weights_path, by_name=True)
-    ctpn_model.summary()
-
+        print("\nLoad model weights from %s\n"%weights_path)
+    
     training_generator, validation_generator = data_generator(data_file=data_file,
                                                               batch_size=BATCH_SIZE_BOOK_PAGE,
                                                               src_type=src_type,
                                                               text_type=model_type)
     # 开始训练
     ctpn_model.fit_generator(generator=training_generator,
-                             steps_per_epoch=1000,
+                             steps_per_epoch=500,
                              epochs=epochs,
                              initial_epoch=init_epochs,
                              validation_data=validation_generator,
@@ -62,8 +63,9 @@ def main(data_file, src_type, model_type, epochs, init_epochs=0, model_struc="de
                              verbose=1,
                              callbacks=get_callbacks(),
                              max_queue_size=100,
-                             workers=2,
-                             use_multiprocessing=True)
+                             workers=5,
+                             use_multiprocessing=True
+                             )
 
     # 保存模型
     ctpn_model.save(os.path.join(CTPN_CKPT_DIR, model_type+"_"+model_struc+"_ctpn_finished.h5"))

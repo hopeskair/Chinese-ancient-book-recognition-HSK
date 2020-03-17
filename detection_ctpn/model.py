@@ -5,21 +5,21 @@ import tensorflow as tf
 from tensorflow.keras import backend as K
 from tensorflow.keras import layers, models, optimizers, regularizers
 
-from ..networks.resnet import ResNet58V2_for_ctpn as ResNet_for_ctpn
-from ..networks.resnext import ResNeXt58_for_ctpn as ResNeXt_for_ctpn
-from ..networks.densenet import DenseNet60_for_ctpn as DenseNet_for_ctpn
+from networks.resnet import ResNet58V2_for_ctpn as ResNet_for_ctpn
+from networks.resnext import ResNeXt58_for_ctpn as ResNeXt_for_ctpn
+from networks.densenet import DenseNet60_for_ctpn as DenseNet_for_ctpn
 
 from .anchors import generate_anchors_then_filter
 from .gen_target import CtpnTarget
 from .text_proposals import TextProposal
 from .losses import ctpn_cls_loss, ctpn_regress_loss, side_regress_loss
 
-from ..config import CTPN_ANCHORS_WIDTH, CTPN_ANCHORS_HEIGHTS
-from ..config import CTPN_TRAIN_ANCHORS_PER_IMAGE, CTPN_ANCHOR_POSITIVE_RATIO
-from ..config import CTPN_USE_SIDE_REFINE, CTPN_PROPOSALS_MAX_NUM
-from ..config import CTPN_PROPOSALS_MIN_SCORE, CTPN_PROPOSALS_NMS_THRESH
-from ..config import CTPN_INIT_LEARNING_RATE, CTPN_LEARNING_MOMENTUM, CTPN_GRADIENT_CLIP_NORM
-from ..config import CTPN_LOSS_WEIGHTS, CTPN_WEIGHT_DECAY
+from config import CTPN_ANCHORS_WIDTH, CTPN_ANCHORS_HEIGHTS
+from config import CTPN_TRAIN_ANCHORS_PER_IMAGE, CTPN_ANCHOR_POSITIVE_RATIO
+from config import CTPN_USE_SIDE_REFINE, CTPN_PROPOSALS_MAX_NUM
+from config import CTPN_PROPOSALS_MIN_SCORE, CTPN_PROPOSALS_NMS_THRESH
+from config import CTPN_INIT_LEARNING_RATE, CTPN_LEARNING_MOMENTUM, CTPN_GRADIENT_CLIP_NORM
+from config import CTPN_LOSS_WEIGHTS, CTPN_WEIGHT_DECAY
 
 
 def CNN(inputs, scope="densenet"):
@@ -58,28 +58,31 @@ def Bidirectional_RNN(inputs, rnn_units=256, scope="gru"):
     return outputs
 
 
-def ctpn_net(stage="train", model_struc="densenet_gru"):
+def ctpn_net(stage="train", batch_size=1, model_struc="densenet_gru"):
     num_anchors = len(CTPN_ANCHORS_HEIGHTS)
     
-    batch_images = layers.Input(shape=[None, None, 1], name='batch_images')
-    batch_boxes = layers.Input(shape=[None, 6], name='batch_boxes') # x1, y1, x2, y2, class_id, padding_flag
-    
-    features = CNN(batch_images, scope=model_struc.split("_")[0])   # 1/16
+    batch_images = layers.Input(batch_shape=[batch_size, None, None, 1], name='batch_images')
+    batch_boxes = layers.Input(batch_shape=[batch_size, None, 6], name='batch_boxes')
+    # x1, y1, x2, y2, class_id, padding_flag
+
+    inputs = 1. - batch_images / 255.
+    features = CNN(inputs, scope=model_struc.split("_")[0])   # 1/16
     
     predict_class_logits, predict_deltas, predict_side_deltas = \
         CTPN(features, num_anchors, rnn_units=128, fc_units=256, rnn_type=model_struc.split("_")[1])
-
+    
     valid_anchors, valid_indices = layers.Lambda(generate_anchors_then_filter,
                                                  arguments={"feat_stride":16,
                                                             "anchor_width":CTPN_ANCHORS_WIDTH,
                                                             "anchor_heights":CTPN_ANCHORS_HEIGHTS},
                                                  name="gen_ctpn_anchors"
-                                                 )(feat_shape=tf.shape(features))
+                                                 )(tf.shape(features)[1:3])
     
     if stage == 'train':
         targets = CtpnTarget(train_anchors_num=CTPN_TRAIN_ANCHORS_PER_IMAGE,
-                             positive_ratios=CTPN_ANCHOR_POSITIVE_RATIO,
+                             positive_ratio=CTPN_ANCHOR_POSITIVE_RATIO,
                              name='ctpn_target')([batch_boxes, valid_anchors, valid_indices])
+        
         deltas, class_ids, anchor_indices_sampled = targets[:3]
         
         # 损失函数
@@ -87,10 +90,10 @@ def ctpn_net(stage="train", model_struc="densenet_gru"):
                                  name='ctpn_class_loss')([predict_class_logits, class_ids, anchor_indices_sampled])
         regress_loss = layers.Lambda(lambda x: ctpn_regress_loss(*x),
                                      name='ctpn_regress_loss')([predict_deltas, deltas, class_ids, anchor_indices_sampled])
-        # side_loss = layers.Lambda(lambda x: side_regress_loss(*x),
-        #                           name='side_regress_loss')([predict_deltas, deltas, class_ids, anchor_indices_sampled])
+        side_loss = layers.Lambda(lambda x: side_regress_loss(*x),
+                                  name='side_regress_loss')([predict_deltas, deltas, class_ids, anchor_indices_sampled])
         
-        model = models.Model(inputs=[batch_images, batch_boxes], outputs=[regress_loss, cls_loss])
+        model = models.Model(inputs=[batch_images, batch_boxes], outputs=[cls_loss, regress_loss, side_loss])
 
     else:
         text_boxes, text_scores, text_class_logits = \
@@ -144,21 +147,21 @@ def compile(keras_model, loss_names=[]):
                                clipnorm=CTPN_GRADIENT_CLIP_NORM)
     
     # 添加损失函数，首先清除损失，防止重复计算
-    keras_model._losses = []
-    keras_model._per_input_losses = {}
-
+    # keras_model._losses = []
+    # keras_model._per_input_losses = {}
+    
     for loss_name in loss_names:
         loss_layer = get_layer(keras_model, loss_name)
-        if loss_layer is None or loss_layer.output in keras_model.losses:
-            continue
+        if loss_layer is None: continue
         loss = loss_layer.output * CTPN_LOSS_WEIGHTS.get(loss_name, 1.)
         keras_model.add_loss(loss)
-
+        
     # 添加L2正则化，跳过Batch Normalization的gamma和beta权重
     reg_losses = [regularizers.l2(CTPN_WEIGHT_DECAY)(w) / tf.cast(tf.size(w), tf.float32)
                   for w in keras_model.trainable_weights
                   if "gamma" not in w.name and "beta" not in w.name]
-    keras_model.add_loss(tf.add_n(reg_losses))
+    
+    keras_model.add_loss(lambda :tf.reduce_sum(reg_losses))
 
     # 编译, 使用虚拟损失
     keras_model.compile(optimizer=optimizer, loss=[None] * len(keras_model.outputs))
@@ -170,9 +173,9 @@ def compile(keras_model, loss_names=[]):
         loss_layer = get_layer(keras_model, loss_name)
         if loss_layer is None: continue
         
-        keras_model.metrics_names.append(loss_name)
         loss = loss_layer.output * CTPN_LOSS_WEIGHTS.get(loss_name, 1.)
-        keras_model.metrics_tensors.append(loss)
+        keras_model.add_metric(loss, name=loss_name, aggregation='mean')
+        keras_model.metrics_names.append(loss_name)
 
 
 def add_metrics(keras_model, metric_name_list, metric_tensor_list):
@@ -183,4 +186,4 @@ def add_metrics(keras_model, metric_name_list, metric_tensor_list):
     """
     for name, tensor in zip(metric_name_list, metric_tensor_list):
         keras_model.metrics_names.append(name)
-        keras_model.metrics_tensors.append(tf.reduce_mean(tensor, keepdims=False))
+        keras_model.add_metric(tensor, name=name, aggregation='mean')

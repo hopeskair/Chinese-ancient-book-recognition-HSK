@@ -239,7 +239,7 @@ def generate_char_img_into_unclosed_box(np_background, x1, y1, x2=None, y2=None,
     chinese_char, PIL_char_img = next(Char_Image_Generator)
     
     # 随机决定是否对汉字图片进行旋转，以及旋转的角度
-    if random.random() < 0.2:
+    if random.random() < 0.35:
         PIL_char_img = rotate_PIL_image(PIL_char_img, rotate_angle=random.randint(-MAX_ROTATE_ANGLE, MAX_ROTATE_ANGLE))
 
     # 转为numpy格式
@@ -337,7 +337,7 @@ def resize_img_by_opencv(np_img, obj_size):
     return resized_np_img
 
 
-def chinese_char_img_generator_using_font(img_size=96):
+def chinese_char_img_generator_using_font(img_size=64):
     print("Get all_chinese_list ...")
     all_chinese_list = list(CHAR2ID_DICT.keys())
 

@@ -107,6 +107,7 @@ def DenseNet53_for_crnn(inputs, scope="densenet"):
 def DenseNet60_for_ctpn(inputs, scope="densenet"):
     with backend.name_scope(scope):
         outputs = DenseNet(inputs, blocks=[3, 9, 8, 8])  # 1/16 size
+        # outputs = DenseNet(inputs, blocks=[2, 3, 3, 3])  # for test
     return outputs
 
 

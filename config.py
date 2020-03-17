@@ -55,7 +55,9 @@ VALIDATION_SPLIT = 0.1
 
 # book page detection
 BOX_CLASSES_ON_BOOK = ["text",]
-BATCH_SIZE_BOOK_PAGE = 2
+BATCH_SIZE_BOOK_PAGE = 1
+BOOK_PAGE_FIXED_SIZE = (640, 640)
+BOOK_PAGE_MAX_GT_BOXES = 1600
 
 # text line recognition crnn
 BATCH_SIZE_TEXT_LINE = 8
@@ -63,7 +65,7 @@ BATCH_SIZE_TEXT_LINE = 8
 
 
 # *********************** data format conversion *************************
-CPTN_BOOK_PAGE_TAGS_FILE = os.path.join(DATA_DIR, "book_pages", "book_pages_tags_cptn.txt")
+CTPN_BOOK_PAGE_TAGS_FILE = os.path.join(DATA_DIR, "book_pages", "book_pages_tags_ctpn.txt")
 YOLO3_BOOK_PAGE_TAGS_FILE = os.path.join(DATA_DIR, "book_pages", "book_pages_tags_yolo3.txt")
 CRNN_TEXT_LINE_TAGS_FILE_H = os.path.join(DATA_DIR, "text_lines", "text_lines_tags_crnn_horizontal.txt")
 CRNN_TEXT_LINE_TAGS_FILE_V = os.path.join(DATA_DIR, "text_lines", "text_lines_tags_crnn_vertical.txt")
@@ -99,6 +101,8 @@ CTPN_TRAIN_ANCHORS_PER_IMAGE = 1024
 CTPN_ANCHOR_POSITIVE_RATIO = 0.5
 
 # text proposal
+CTPN_POS_ANCHOR_IOU = 0.65
+CTPN_NEG_ANCHOR_IOU = 0.4
 CTPN_PROPOSALS_MIN_SCORE = 0.7
 CTPN_PROPOSALS_NMS_THRESH = 0.3
 CTPN_PROPOSALS_MAX_NUM = 1024

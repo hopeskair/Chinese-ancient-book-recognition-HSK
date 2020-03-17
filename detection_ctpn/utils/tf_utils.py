@@ -20,7 +20,7 @@ def pad_to_fixed_size(input_tensor, fixed_size):
     padding_size = tf.maximum(0, fixed_size - input_size)
     x = tf.pad(x, [[0, padding_size], [0, 0]], mode='CONSTANT', constant_values=0)  # padding
     
-    return x
+    return x[:fixed_size]
 
 
 def remove_pad(input_tensor):
