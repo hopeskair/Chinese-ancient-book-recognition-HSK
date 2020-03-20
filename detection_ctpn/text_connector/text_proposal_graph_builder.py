@@ -66,7 +66,7 @@ class TextProposalGraphBuilder:
         for index, box in enumerate(text_proposals):
             boxes_table[int(box[0])].append(index)
         self.boxes_table = boxes_table
-
+        
         graph = np.zeros((text_proposals.shape[0], text_proposals.shape[0]), np.bool)
 
         for index, box in enumerate(text_proposals):

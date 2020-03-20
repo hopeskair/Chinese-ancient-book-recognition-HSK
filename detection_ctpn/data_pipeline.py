@@ -26,10 +26,11 @@ def get_image_and_boxes(annotation_line):
 
 
 def change_text_vertical_to_horisontal(np_img, boxes=None):
-    h, w = np_img.shape[:2]
-    np_img = np_img.transpose((1,0))[::-1, ...]
-    
+    axes = (1,0) if len(np_img.shape) == 2 else (1,0,2)
+    np_img = np_img.transpose(axes)[::-1, ...]
+
     if boxes is not None:
+        h, w = np_img.shape[:2]
         x1, y1, x2, y2 = boxes[:, 0], boxes[:, 1], boxes[:, 2], boxes[:, 3]
         x1_tr, y1_tr, x2_tr, y2_tr = y1, x1, y2, x2
         x1_flip, y1_flip, x2_flip, y2_flip = x1_tr, w - 1 - y1_tr, x2_tr, w - 1 - y2_tr  # upside-down
@@ -43,7 +44,7 @@ def change_text_vertical_to_horisontal_tf(image, boxes=None):
     h, w = tf.shape(image)[0], tf.shape(image)[1]
     h, w = tf.cast(h, tf.float32), tf.cast(w, tf.float32)
     perm = (1,0) if len(image.shape) == 2 else (1,0,2)
-    image = tf.transpose(image, perm=perm)
+    image = tf.transpose(image, perm=perm)[::-1]
     
     if boxes is not None:
         x1, y1, x2, y2 = boxes[:, 0], boxes[:, 1], boxes[:, 2], boxes[:, 3]
@@ -56,12 +57,11 @@ def change_text_vertical_to_horisontal_tf(image, boxes=None):
 
 
 def restore_text_horizontal_to_vertical(horizontal_text_img):
-    shape = horizontal_text_img.shape[:2]
-    h, w = shape[:2]
+    shape = horizontal_text_img.shape
     if len(shape) == 2:
-        np_img = horizontal_text_img.transpose((1, 0))[::-1, ...]
+        np_img = horizontal_text_img[::-1].transpose((1, 0))
     elif len(shape):
-        np_img = horizontal_text_img.transpose((1, 0, 2))[::-1, ...]
+        np_img = horizontal_text_img[::-1].transpose((1, 0, 2))
     return np_img
 
 
@@ -137,6 +137,10 @@ def adjust_img_and_splite_boxes_tf(image, boxes, cls_id,
     # vertical to horizontal
     if text_type.lower() in ("v", "vertical"):
         image, boxes = change_text_vertical_to_horisontal_tf(image, boxes)
+        
+    # to rgb
+    channels = tf.shape(image)[-1]
+    image = tf.cond(channels == 3, lambda: image, lambda: tf.image.grayscale_to_rgb(image))
     
     # scale image to fixed size
     fixed_size = tf.constant([fixed_size[0], fixed_size[1]], dtype=tf.float32)  # 16的倍数
@@ -158,10 +162,34 @@ def adjust_img_and_splite_boxes_tf(image, boxes, cls_id,
     # augment image
     image = tf.cast(image, tf.uint8)
     image = tf.image.random_brightness(image, max_delta=0.5)
-    image = tf.image.random_contrast(image, lower=0.5, upper=2.)
-    image = tf.image.random_jpeg_quality(image, min_jpeg_quality=40, max_jpeg_quality=90)
+    image = tf.image.random_contrast(image, lower=0.3, upper=1.)
+    image = tf.image.random_hue(image, max_delta=0.5)
+    image = tf.image.random_saturation(image, lower=0.5, upper=90)
     
     return image, gt_boxes
+
+
+def adjust_img_into_model(np_img, text_type="horizontal", fixed_size=BOOK_PAGE_FIXED_SIZE):
+    
+    # vertical to horizontal
+    if text_type.lower() in ("v", "vertical"):
+        np_img, _ = change_text_vertical_to_horisontal(np_img)
+        
+    # to rgb
+    if len(np_img.shape) == 2 or ( len(np_img.shape) == 3 and np_img.shape[-1] == 1):
+        np_img = Image.fromarray(np_img).convert(mode="RGB")
+        
+    # scale image to fixed size
+    fixed_size = np.array(fixed_size[:2], dtype=np.float32)  # 16的倍数
+    raw_shape = np.array(np_img.shape[:2], dtype=np.float32)
+    scale_ratio = np.min(fixed_size / raw_shape)
+    new_size = (raw_shape * scale_ratio).astype(np.int32)
+    np_img = np.asarray(Image.fromarray(np_img).resize(size=new_size[::-1]))    # PIL (w, h), np (h, w)
+    delta = fixed_size.astype(np.int32) - new_size
+    dh, dw = delta[0], delta[1]
+    np_img = np.pad(np_img, pad_width=((0, dh), (0, dw), (0, 0)), mode='constant', constant_values=255)  # fixed_size, 白底黑字
+    
+    return np_img
 
 
 def data_generator_with_images(annotation_lines, batch_size, text_type="horizontal"):
@@ -214,10 +242,17 @@ def data_generator_with_tfrecords(tfrecords_files, batch_size, text_type="horizo
         
         return {"batch_images": image, "batch_boxes": gt_boxes}
     
-    data_set = data_set.map(parse_fn, tf.data.experimental.AUTOTUNE).shuffle(100).batch(batch_size).prefetch(100)
+    data_set = data_set.map(parse_fn, tf.data.experimental.AUTOTUNE).shuffle(100).batch(batch_size).prefetch(200)
     
     return data_set
-        
+
+
+def image_preprocess(images):
+    
+    convert_imgs = tf.image.per_image_standardization(images)
+    convert_imgs = tf.cond(tf.random.uniform([]) < 0.5, lambda: convert_imgs, lambda: 1. - convert_imgs)
+    
+    return convert_imgs
 
 
 def data_generator(data_file, batch_size, src_type="images", text_type="horizontal", validation_split=0.1):

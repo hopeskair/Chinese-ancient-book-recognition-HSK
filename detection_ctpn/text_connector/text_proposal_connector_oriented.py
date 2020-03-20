@@ -63,7 +63,7 @@ class TextProposalConnector:
             height = np.mean((text_line_boxes[:, 3] - text_line_boxes[:, 1]))  # 小框平均高度
             text_lines[index, 7] = height + 2.5
 
-        text_recs = np.zeros((len(text_lines), 9), np.float)
+        text_recs = np.zeros((len(text_lines), 9), np.float32)
         index = 0
         for line in text_lines:
             b1 = line[6] - line[7] / 2  # 根据高度和文本行中心线，求取文本行上下两条线的b值

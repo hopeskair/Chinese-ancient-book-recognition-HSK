@@ -4,10 +4,10 @@
 import tensorflow as tf
 from tensorflow.keras import layers
 
-from detection_ctpn.utils.tf_utils import pad_to_fixed_size
+from detection_ctpn.utils import tf_utils
 
 
-def apply_regress(deltas, side_deltas, anchors, use_side_refine=False):
+def apply_regress(deltas, side_deltas, anchors, use_side_refine=True):
     """应用回归目标到边框, 垂直中心点偏移和高度缩放
     Parameter:
         deltas: 回归目标 [num_anchors,(dy,dh)]
@@ -57,7 +57,7 @@ def get_valid_predicts(deltas, side_deltas, class_logits, valid_anchors_indices)
     return [deltas, side_deltas, class_logits]
 
 
-def nms(boxes, scores, class_logits, max_outputs=2000, iou_thresh=0.5, score_thresh=0.1, name=None):
+def nms(boxes, scores, class_logits, max_outputs=1500, iou_thresh=0.5, score_thresh=0.2, name=None):
     """非极大抑制
     Parameter:
         boxes: [num_boxes, 4], 浮点型Tensor
@@ -70,7 +70,7 @@ def nms(boxes, scores, class_logits, max_outputs=2000, iou_thresh=0.5, score_thr
     indices = tf.image.non_max_suppression(boxes, scores,
                                            max_output_size=max_outputs,
                                            iou_threshold=iou_thresh,
-                                           score_threshol=score_thresh,
+                                           score_threshold=score_thresh,
                                            name=name)
     
     output_boxes = tf.gather(boxes, indices)
@@ -78,16 +78,16 @@ def nms(boxes, scores, class_logits, max_outputs=2000, iou_thresh=0.5, score_thr
     class_logits = tf.gather(class_logits, indices)
 
     # padding到固定大小
-    output_boxes = pad_to_fixed_size(output_boxes, max_outputs),
-    box_scores = pad_to_fixed_size(box_scores[:, tf.newaxis], max_outputs),
-    class_logits = pad_to_fixed_size(class_logits, max_outputs)
+    output_boxes = tf_utils.pad_to_fixed_size(output_boxes, max_outputs)
+    box_scores = tf_utils.pad_to_fixed_size(box_scores[:, tf.newaxis], max_outputs)
+    class_logits = tf_utils.pad_to_fixed_size(class_logits, max_outputs)
     
     return [output_boxes, box_scores, class_logits]
 
 
 class TextProposal(layers.Layer):
     """生成候选框"""
-    def __init__(self, nms_max_outputs=1024, cls_score_thresh=0.7, iou_thresh=0.3, use_side_refine=False, **kwargs):
+    def __init__(self, nms_max_outputs=1024, cls_score_thresh=0.7, iou_thresh=0.3, use_side_refine=True, **kwargs):
         self.nms_max_outputs = nms_max_outputs
         self.cls_score_thresh = cls_score_thresh
         self.iou_thresh = iou_thresh
@@ -114,12 +114,12 @@ class TextProposal(layers.Layer):
         # 转化为分类score
         class_scores = tf.nn.softmax(logits=class_logits, axis=-1)
         fg_scores = tf.reduce_max(class_scores[..., 1:], axis=-1)   # bg_pos:0, fg_pos:1
-
+        
         # 应用边框回归
         options = {"anchors": valid_indices, "use_side_refine":self.use_side_refine}
         proposals = tf.map_fn(fn=lambda args: apply_regress(*args, anchors=valid_anchors),
                               elems=[deltas, side_deltas],
-                              dtype=[tf.float32, tf.float32])
+                              dtype=tf.float32)
         
         # 非极大抑制
         options = {"max_outputs": self.nms_max_outputs,

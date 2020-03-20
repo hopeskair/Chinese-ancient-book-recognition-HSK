@@ -9,10 +9,12 @@ from networks.resnet import ResNet58V2_for_ctpn as ResNet_for_ctpn
 from networks.resnext import ResNeXt58_for_ctpn as ResNeXt_for_ctpn
 from networks.densenet import DenseNet60_for_ctpn as DenseNet_for_ctpn
 
+from .data_pipeline import image_preprocess
 from .anchors import generate_anchors_then_filter
 from .gen_target import CtpnTarget
 from .text_proposals import TextProposal
 from .losses import ctpn_cls_loss, ctpn_regress_loss, side_regress_loss
+from .visualize import images_to_summary_tf
 
 from config import CTPN_ANCHORS_WIDTH, CTPN_ANCHORS_HEIGHTS
 from config import CTPN_TRAIN_ANCHORS_PER_IMAGE, CTPN_ANCHOR_POSITIVE_RATIO
@@ -20,6 +22,7 @@ from config import CTPN_USE_SIDE_REFINE, CTPN_PROPOSALS_MAX_NUM
 from config import CTPN_PROPOSALS_MIN_SCORE, CTPN_PROPOSALS_NMS_THRESH
 from config import CTPN_INIT_LEARNING_RATE, CTPN_LEARNING_MOMENTUM, CTPN_GRADIENT_CLIP_NORM
 from config import CTPN_LOSS_WEIGHTS, CTPN_WEIGHT_DECAY
+from config import BOOK_PAGE_FIXED_SIZE, BOOK_PAGE_MAX_GT_BOXES
 
 
 def CNN(inputs, scope="densenet"):
@@ -58,68 +61,16 @@ def Bidirectional_RNN(inputs, rnn_units=256, scope="gru"):
     return outputs
 
 
-def ctpn_net(stage="train", batch_size=1, model_struc="densenet_gru"):
-    num_anchors = len(CTPN_ANCHORS_HEIGHTS)
-    
-    batch_images = layers.Input(batch_shape=[batch_size, None, None, 1], name='batch_images')
-    batch_boxes = layers.Input(batch_shape=[batch_size, None, 6], name='batch_boxes')
-    # x1, y1, x2, y2, class_id, padding_flag
-
-    inputs = 1. - batch_images / 255.
-    features = CNN(inputs, scope=model_struc.split("_")[0])   # 1/16
-    
-    predict_class_logits, predict_deltas, predict_side_deltas = \
-        CTPN(features, num_anchors, rnn_units=128, fc_units=256, rnn_type=model_struc.split("_")[1])
-    
-    valid_anchors, valid_indices = layers.Lambda(generate_anchors_then_filter,
-                                                 arguments={"feat_stride":16,
-                                                            "anchor_width":CTPN_ANCHORS_WIDTH,
-                                                            "anchor_heights":CTPN_ANCHORS_HEIGHTS},
-                                                 name="gen_ctpn_anchors"
-                                                 )(tf.shape(features)[1:3])
-    
-    if stage == 'train':
-        targets = CtpnTarget(train_anchors_num=CTPN_TRAIN_ANCHORS_PER_IMAGE,
-                             positive_ratio=CTPN_ANCHOR_POSITIVE_RATIO,
-                             name='ctpn_target')([batch_boxes, valid_anchors, valid_indices])
-        
-        deltas, class_ids, anchor_indices_sampled = targets[:3]
-        
-        # 损失函数
-        cls_loss = layers.Lambda(lambda x: ctpn_cls_loss(*x),
-                                 name='ctpn_class_loss')([predict_class_logits, class_ids, anchor_indices_sampled])
-        regress_loss = layers.Lambda(lambda x: ctpn_regress_loss(*x),
-                                     name='ctpn_regress_loss')([predict_deltas, deltas, class_ids, anchor_indices_sampled])
-        side_loss = layers.Lambda(lambda x: side_regress_loss(*x),
-                                  name='side_regress_loss')([predict_deltas, deltas, class_ids, anchor_indices_sampled])
-        
-        model = models.Model(inputs=[batch_images, batch_boxes], outputs=[cls_loss, regress_loss, side_loss])
-
-    else:
-        text_boxes, text_scores, text_class_logits = \
-            TextProposal(nms_max_outputs=CTPN_PROPOSALS_MAX_NUM,
-                         cls_score_thresh=CTPN_PROPOSALS_MIN_SCORE,
-                         iou_thresh=CTPN_PROPOSALS_NMS_THRESH,
-                         use_side_refine=CTPN_USE_SIDE_REFINE,
-                         name="text_proposals"
-            )([predict_deltas, predict_side_deltas, predict_class_logits, valid_anchors, valid_indices])
-        
-        model = models.Model(inputs=batch_images, outputs=[text_boxes, text_scores])
-        
-    return model
-
-
 def CTPN(features, num_anchors, rnn_units=128, fc_units=512, rnn_type="gru"):
+    features = Bidirectional_RNN(features, rnn_units, scope=rnn_type)
     
-    rnn_outputs = Bidirectional_RNN(features, rnn_units, scope=rnn_type)
-
     # conv实现fc
-    x = layers.Conv2D(fc_units, kernel_size=(1, 1), name='fc_output')(rnn_outputs)
+    x = layers.Conv2D(fc_units, kernel_size=(1, 1), name='fc_output')(features)
     x = layers.BatchNormalization(axis=3, epsilon=1.001e-5, name="fc_bn")(x)
     x = layers.Activation('relu', name="fc_relu")(x)
     
     # 分类
-    class_logits = layers.Conv2D(2*num_anchors, kernel_size=(1, 1), name='cls')(x)
+    class_logits = layers.Conv2D(2 * num_anchors, kernel_size=(1, 1), name='cls')(x)
     class_logits = layers.Reshape(target_shape=(-1, 2), name='cls_reshape')(class_logits)
     # 中心点垂直坐标和高度回归
     predict_deltas = layers.Conv2D(2 * num_anchors, kernel_size=(1, 1), name='deltas')(x)
@@ -129,6 +80,82 @@ def CTPN(features, num_anchors, rnn_units=128, fc_units=512, rnn_type="gru"):
     predict_side_deltas = layers.Reshape(target_shape=(-1, 1), name='side_deltas_reshape')(predict_side_deltas)
     
     return class_logits, predict_deltas, predict_side_deltas
+
+
+def build_ctpn(batch_size=1, model_struc="densenet_gru"):
+    num_anchors = len(CTPN_ANCHORS_HEIGHTS)
+    inp_h, inp_w = BOOK_PAGE_FIXED_SIZE
+    num_gt_boxes = BOOK_PAGE_MAX_GT_BOXES
+    
+    # ******************** Build *********************
+    batch_images = layers.Input(batch_shape=[batch_size, inp_h, inp_w, 3], name='batch_images')
+    batch_boxes = layers.Input(batch_shape=[batch_size, num_gt_boxes, 6], name='batch_boxes')
+    # x1, y1, x2, y2, class_id, padding_flag
+    
+    convert_imgs = layers.Lambda(image_preprocess, name="image_preprocess")(batch_images)
+    
+    features = CNN(convert_imgs, scope=model_struc.split("_")[0])  # 1/16
+    feat_shape = layers.Lambda(lambda x: tf.shape(x)[1:3], name="feature_shape")(features)
+    
+    predict_class_logits, predict_deltas, predict_side_deltas = \
+        CTPN(features, num_anchors, rnn_units=128, fc_units=256, rnn_type=model_struc.split("_")[1])
+    
+    ctpn_model = models.Model(inputs=[batch_images, batch_boxes],
+                              outputs=[predict_class_logits, predict_deltas, predict_side_deltas])
+    
+    return ctpn_model, feat_shape
+
+
+def work_net(stage="train", batch_size=1, text_type="horizontal", model_struc="densenet_gru"):
+    
+    ctpn_model, feat_shape = build_ctpn(batch_size, model_struc)
+
+    batch_images, batch_boxes = ctpn_model.inputs
+    predict_class_logits, predict_deltas, predict_side_deltas = ctpn_model.outputs
+    
+    valid_anchors, valid_indices = layers.Lambda(generate_anchors_then_filter,
+                                                 arguments={"feat_stride":16,
+                                                            "anchor_width":CTPN_ANCHORS_WIDTH,
+                                                            "anchor_heights":CTPN_ANCHORS_HEIGHTS},
+                                                 name="gen_ctpn_anchors"
+                                                 )(feat_shape)
+    
+    # ******************** Train model **********************
+    targets = CtpnTarget(train_anchors_num=CTPN_TRAIN_ANCHORS_PER_IMAGE,
+                         positive_ratio=CTPN_ANCHOR_POSITIVE_RATIO,
+                         name='ctpn_target')([batch_boxes, valid_anchors, valid_indices])
+    
+    deltas, class_ids, anchor_indices_sampled = targets[:3]
+    
+    # 损失函数
+    cls_loss = layers.Lambda(lambda x: ctpn_cls_loss(*x),
+                             name='ctpn_class_loss')([predict_class_logits, class_ids, anchor_indices_sampled])
+    regress_loss = layers.Lambda(lambda x: ctpn_regress_loss(*x),
+                                 name='ctpn_regress_loss')([predict_deltas, deltas, class_ids, anchor_indices_sampled])
+    side_loss = layers.Lambda(lambda x: side_regress_loss(*x),
+                              name='side_regress_loss')([predict_side_deltas, deltas, class_ids, anchor_indices_sampled])
+    
+    # ******************** Predict model *********************
+    text_boxes, text_scores, text_class_logits = \
+        TextProposal(nms_max_outputs=CTPN_PROPOSALS_MAX_NUM,
+                     cls_score_thresh=CTPN_PROPOSALS_MIN_SCORE,
+                     iou_thresh=CTPN_PROPOSALS_NMS_THRESH,
+                     use_side_refine=CTPN_USE_SIDE_REFINE,
+                     name="text_proposals"
+        )([predict_deltas, predict_side_deltas, predict_class_logits, valid_anchors, valid_indices])
+
+    # ******************** Image summary *********************
+    summary_img = layers.Lambda(images_to_summary_tf,
+                                arguments={"text_type":text_type},
+                                name="image_summary")([batch_images, text_boxes, text_scores])
+    
+    # ********************* Build model **********************
+    if stage == 'train':
+        train_model = models.Model(inputs=ctpn_model.inputs, outputs=[cls_loss, regress_loss, side_loss])
+        summary_model = models.Model(inputs=ctpn_model.inputs, outputs=[summary_img])   # 孪生网络
+        return train_model, summary_model
+    else:
+        return models.Model(inputs=batch_images, outputs=[text_boxes, text_scores])
 
 
 def get_layer(keras_model, name):

@@ -70,7 +70,7 @@ def ctpn_regress_loss(predict_deltas, tgt_deltas, tgt_cls_ids, anchor_indices_sa
     return loss
 
 
-def side_regress_loss(predict_deltas, tgt_deltas, tgt_cls_ids, anchor_indices_sampled):
+def side_regress_loss(predict_side_deltas, tgt_deltas, tgt_cls_ids, anchor_indices_sampled):
     """侧边改善回归损失
     Parameter:
         predict_deltas: 预测的dx回归目标，[batch_num, anchors_num, 2]
@@ -89,10 +89,10 @@ def side_regress_loss(predict_deltas, tgt_deltas, tgt_cls_ids, anchor_indices_sa
     # 正样本anchor的2维索引
     train_indices_2d = tf.stack([batch_indices, tf.cast(true_anchor_indices, dtype=tf.int64)], axis=1)
     # 正样本anchor对应的预测
-    predict_deltas = tf.gather_nd(predict_deltas, train_indices_2d, name='ctpn_side_regress_loss')
+    predict_side_deltas = tf.gather_nd(predict_side_deltas, train_indices_2d, name='ctpn_side_regress_loss')
 
     # Smooth-L1 # 非常重要，不然报NAN
-    loss = K.switch(tf.size(deltas_x) > 0, smooth_l1_loss(deltas_x, predict_deltas), tf.constant(0.0))
+    loss = K.switch(tf.size(deltas_x) > 0, smooth_l1_loss(deltas_x, predict_side_deltas), tf.constant(0.0))
     loss = K.mean(loss)
     
     return loss
