@@ -10,9 +10,15 @@ import numpy as np
 import tensorflow as tf
 from PIL import Image
 
-from config import TEXT_LINE_IMGS_H, TEXT_LINE_TAGS_FILE_H
-from config import TEXT_LINE_IMGS_V, TEXT_LINE_TAGS_FILE_V
-from config import TEXT_LINE_TFRECORDS_H, TEXT_LINE_TFRECORDS_V
+from config import ONE_TEXT_LINE_IMGS_H, ONE_TEXT_LINE_TAGS_FILE_H
+from config import ONE_TEXT_LINE_IMGS_V, ONE_TEXT_LINE_TAGS_FILE_V
+from config import ONE_TEXT_LINE_TFRECORDS_H, ONE_TEXT_LINE_TFRECORDS_V
+from config import TWO_TEXT_LINE_IMGS_H, TWO_TEXT_LINE_TAGS_FILE_H
+from config import TWO_TEXT_LINE_IMGS_V, TWO_TEXT_LINE_TAGS_FILE_V
+from config import TWO_TEXT_LINE_TFRECORDS_H, TWO_TEXT_LINE_TFRECORDS_V
+from config import MIX_TEXT_LINE_IMGS_H, MIX_TEXT_LINE_TAGS_FILE_H
+from config import MIX_TEXT_LINE_IMGS_V, MIX_TEXT_LINE_TAGS_FILE_V
+from config import MIX_TEXT_LINE_TFRECORDS_H, MIX_TEXT_LINE_TFRECORDS_V
 from config import FONT_FILE_DIR, EXTERNEL_IMAGES_DIR, MAX_ROTATE_ANGLE
 from util import CHAR2ID_DICT, IGNORABLE_CHARS, IMPORTANT_CHARS
 
@@ -26,52 +32,61 @@ from data_generator.img_utils import load_external_image_bigger
 from data_generator.generate_chinese_images import get_external_image_paths
 
 
-def generate_text_line_imgs(obj_num=100, type="horizontal", text_shape=None):
-    if type.lower() in ("h", "horizontal"):
-        type = "h"
-    elif type.lower() in ("v", "vertical"):
-        type = "v"
+def check_text_type(text_type):
+    if text_type.lower() in ("h", "horizontal"):
+        text_type = "h"
+    elif text_type.lower() in ("v", "vertical"):
+        text_type = "v"
     else:
-        ValueError("Optional types: 'h', 'horizontal', 'v', 'vertical'.")
+        ValueError("Optional text_types: 'h', 'horizontal', 'v', 'vertical'.")
+    return text_type
+
+
+def check_text_line_shape(shape, text_type):
+    text_h, text_w = shape
+    if text_type == "h":
+        assert text_h <= text_w, "Horizontal text must meet height <= width."
+    if text_type == "v":
+        assert text_h >= text_w, "Vertical text must meet height >= width."
+
+
+def generate_one_text_line_imgs(obj_num=100, text_type="horizontal", text_shape=None):
+    text_type = check_text_type(text_type)
     
-    if type == "h":
-        text_line_imgs_dir, text_line_tags_file = TEXT_LINE_IMGS_H, TEXT_LINE_TAGS_FILE_H
-    if type == "v":
-        text_line_imgs_dir, text_line_tags_file = TEXT_LINE_IMGS_V, TEXT_LINE_TAGS_FILE_V
+    if text_type == "h":
+        text_line_imgs_dir, text_line_tags_file = ONE_TEXT_LINE_IMGS_H, ONE_TEXT_LINE_TAGS_FILE_H
+    if text_type == "v":
+        text_line_imgs_dir, text_line_tags_file = ONE_TEXT_LINE_IMGS_V, ONE_TEXT_LINE_TAGS_FILE_V
     
     check_or_makedirs(text_line_imgs_dir)
     
+    _shape = text_shape
     with open(text_line_tags_file, "w", encoding="utf-8") as fw:
         for i in range(obj_num):
-            if text_shape is None and type == "h":
-                text_shape = (random.randint(36, 72), random.randint(540, 960))
-            if text_shape is None and type == "v":
-                text_shape = (random.randint(540, 960), random.randint(36, 72))
+            if text_shape is None and text_type == "h":
+                _shape = (random.randint(36, 64), random.randint(540, 960))
+            if text_shape is None and text_type == "v":
+                _shape = (random.randint(540, 960), random.randint(36, 64))
+
+            PIL_text, char_and_box_list, split_pos_list = create_one_text_line(_shape, text_type=text_type)
             
-            PIL_text, chinese_char_and_box_list = create_text_line(text_shape, type=type)
-            
-            img_name = "book_pages_%d.jpg" % i
+            img_name = "text_line_%d.jpg" % i
             save_path = os.path.join(text_line_imgs_dir, img_name)
             PIL_text.save(save_path, format="jpeg")
-            fw.write(img_name + "\t" + json.dumps(chinese_char_and_box_list) + "\n")
+            fw.write(img_name + "\t" + json.dumps(char_and_box_list) + "\t" + json.dumps(split_pos_list) + "\n")
 
             if i % 50 == 0:
                 print("Process bar: %.2f%%" % (i*100/obj_num))
                 sys.stdout.flush()
 
 
-def generate_text_line_tfrecords(obj_num=100, type="horizontal", text_shape=None):
-    if type.lower() in ("h", "horizontal"):
-        type = "h"
-    elif type.lower() in ("v", "vertical"):
-        type = "v"
-    else:
-        ValueError("Optional types: 'h', 'horizontal', 'v', 'vertical'.")
+def generate_one_text_line_tfrecords(obj_num=100, text_type="horizontal", text_shape=None):
+    text_type = check_text_type(text_type)
     
-    if type == "h":
-        text_line_tfrecords_dir = TEXT_LINE_TFRECORDS_H
-    if type == "v":
-        text_line_tfrecords_dir = TEXT_LINE_TFRECORDS_V
+    if text_type == "h":
+        text_line_tfrecords_dir = ONE_TEXT_LINE_TFRECORDS_H
+    if text_type == "v":
+        text_line_tfrecords_dir = ONE_TEXT_LINE_TFRECORDS_V
     
     check_or_makedirs(text_line_tfrecords_dir)
 
@@ -80,22 +95,24 @@ def generate_text_line_tfrecords(obj_num=100, type="horizontal", text_shape=None
     writers_list = \
         [tf.io.TFRecordWriter(os.path.join(text_line_tfrecords_dir, "text_lines_%d.tfrecords" % i))
          for i in range(20)]
-
+    
     # 保存生成的文本图片
+    _shape = text_shape
     for i in range(obj_num):
         writer = random.choice(writers_list)
 
-        if text_shape is None and type == "h":
-            text_shape = (random.randint(36, 72), random.randint(540, 960))
-        if text_shape is None and type == "v":
-            text_shape = (random.randint(540, 960), random.randint(36, 72))
-
-        PIL_text, chinese_char_and_box_list = create_text_line(text_shape, type=type)
+        if text_shape is None and text_type == "h":
+            _shape = (random.randint(36, 64), random.randint(540, 960))
+        if text_shape is None and text_type == "v":
+            _shape = (random.randint(540, 960), random.randint(36, 64))
+        
+        PIL_text, char_and_box_list, split_pos_list = create_one_text_line(_shape, text_type=text_type)
 
         bytes_image = PIL_text.tobytes()  # 将图片转化为原生bytes
-        bytes_chars = "".join([chinese_char for chinese_char, gt_box in chinese_char_and_box_list]).encode("utf-8")
-        labels = np.array([CHAR2ID_DICT[char] for char, gt_box in chinese_char_and_box_list], dtype=np.int32).tobytes()
-        gt_boxes = np.array([gt_box for chinese_char, gt_box in chinese_char_and_box_list], dtype=np.int32).tobytes()
+        bytes_chars = "".join([chinese_char for chinese_char, gt_box in char_and_box_list]).encode("utf-8")
+        labels = np.array([CHAR2ID_DICT[char] for char, gt_box in char_and_box_list], dtype=np.int32).tobytes()
+        gt_boxes = np.array([gt_box for chinese_char, gt_box in char_and_box_list], dtype=np.int32).tobytes()
+        split_positions = np.array(split_pos_list).tobytes()
 
         example = tf.train.Example(
             features=tf.train.Features(
@@ -105,7 +122,8 @@ def generate_text_line_tfrecords(obj_num=100, type="horizontal", text_shape=None
                     'img_width': tf.train.Feature(int64_list=tf.train.Int64List(value=[PIL_text.width])),
                     'bytes_chars': tf.train.Feature(bytes_list=tf.train.BytesList(value=[bytes_chars])),
                     'labels':tf.train.Feature(bytes_list=tf.train.BytesList(value=[labels])),
-                    'gt_boxes': tf.train.Feature(bytes_list=tf.train.BytesList(value=[gt_boxes]))
+                    'gt_boxes': tf.train.Feature(bytes_list=tf.train.BytesList(value=[gt_boxes])),
+                    'split_positions': tf.train.Feature(bytes_list=tf.train.BytesList(value=[split_positions]))
                 }))
         writer.write(example.SerializeToString())
 
@@ -118,32 +136,183 @@ def generate_text_line_tfrecords(obj_num=100, type="horizontal", text_shape=None
     return
 
 
-def create_text_line(shape=(96, 480), type="horizontal"):
-    if type.lower() in ("h", "horizontal"):
-        type = "h"
-    elif type.lower() in ("v", "vertical"):
-        type = "v"
-    else:
-        ValueError("Optional types: 'h', 'horizontal', 'v', 'vertical'.")
+def generate_two_text_line_imgs(obj_num=100, text_type="horizontal", text_shape=None):
+    text_type = check_text_type(text_type)
     
+    if text_type == "h":
+        text_line_imgs_dir, text_line_tags_file = TWO_TEXT_LINE_IMGS_H, TWO_TEXT_LINE_TAGS_FILE_H
+    if text_type == "v":
+        text_line_imgs_dir, text_line_tags_file = TWO_TEXT_LINE_IMGS_V, TWO_TEXT_LINE_TAGS_FILE_V
+    
+    check_or_makedirs(text_line_imgs_dir)
+    
+    _shape = text_shape
+    with open(text_line_tags_file, "w", encoding="utf-8") as fw:
+        for i in range(obj_num):
+            if text_shape is None and text_type == "h":
+                _shape = (random.randint(56, 108), random.randint(96, 640)) # 双行文本数据无需太长
+            if text_shape is None and text_type == "v":
+                _shape = (random.randint(96, 640), random.randint(56, 108)) # 双行文本数据无需太长
+
+            PIL_text, _, _, split_pos_list = create_two_text_line(_shape, text_type=text_type)
+            
+            img_name = "text_line_%d.jpg" % i
+            save_path = os.path.join(text_line_imgs_dir, img_name)
+            PIL_text.save(save_path, format="jpeg")
+            fw.write(img_name + "\t" + json.dumps(split_pos_list) + "\n")
+            
+            if i % 50 == 0:
+                print("Process bar: %.2f%%" % (i * 100 / obj_num))
+                sys.stdout.flush()
+
+
+def generate_two_text_line_tfrecords(obj_num=100, text_type="horizontal", text_shape=None):
+    text_type = check_text_type(text_type)
+    
+    if text_type == "h":
+        text_line_tfrecords_dir = TWO_TEXT_LINE_TFRECORDS_H
+    if text_type == "v":
+        text_line_tfrecords_dir = TWO_TEXT_LINE_TFRECORDS_V
+    
+    check_or_makedirs(text_line_tfrecords_dir)
+    
+    # 可以把生成的图片直接存入tfrecords文件
+    # 而不必将生成的图片先保存到磁盘，再从磁盘读取出来保存到tfrecords文件，这样效率太低
+    writers_list = \
+        [tf.io.TFRecordWriter(os.path.join(text_line_tfrecords_dir, "text_lines_%d.tfrecords" % i))
+         for i in range(20)]
+    
+    # 保存生成的文本图片
+    _shape = text_shape
+    for i in range(obj_num):
+        writer = random.choice(writers_list)
+
+        if text_shape is None and text_type == "h":
+            _shape = (random.randint(54, 108), random.randint(720, 1280))
+        if text_shape is None and text_type == "v":
+            _shape = (random.randint(720, 1280), random.randint(54, 108))
+
+        PIL_text, _, _, split_pos_list = create_two_text_line(_shape, text_type=text_type)
+        
+        bytes_image = PIL_text.tobytes()  # 将图片转化为原生bytes
+        split_positions = np.array(split_pos_list).tobytes()
+        
+        example = tf.train.Example(
+            features=tf.train.Features(
+                feature={
+                    'bytes_image': tf.train.Feature(bytes_list=tf.train.BytesList(value=[bytes_image])),
+                    'img_height': tf.train.Feature(int64_list=tf.train.Int64List(value=[PIL_text.height])),
+                    'img_width': tf.train.Feature(int64_list=tf.train.Int64List(value=[PIL_text.width])),
+                    'split_positions': tf.train.Feature(bytes_list=tf.train.BytesList(value=[split_positions]))
+                }))
+        writer.write(example.SerializeToString())
+        
+        if i % 50 == 0:
+            print("Process bar: %.2f%%" % (i * 100 / obj_num))
+            sys.stdout.flush()
+    
+    # 关闭所有的tfrecords写者
+    [writer.close() for writer in writers_list]
+    return
+
+
+def generate_mix_text_line_imgs(obj_num=100, text_type="horizontal", text_shape=None):
+    text_type = check_text_type(text_type)
+    
+    if text_type == "h":
+        text_line_imgs_dir, text_line_tags_file = MIX_TEXT_LINE_IMGS_H, MIX_TEXT_LINE_TAGS_FILE_H
+    if text_type == "v":
+        text_line_imgs_dir, text_line_tags_file = MIX_TEXT_LINE_IMGS_V, MIX_TEXT_LINE_TAGS_FILE_V
+    
+    check_or_makedirs(text_line_imgs_dir)
+    
+    _shape = text_shape
+    with open(text_line_tags_file, "w", encoding="utf-8") as fw:
+        for i in range(obj_num):
+            if text_shape is None and text_type == "h":
+                _shape = (random.randint(54, 108), random.randint(720, 1280))
+            if text_shape is None and text_type == "v":
+                _shape = (random.randint(720, 1280), random.randint(54, 108))
+
+            PIL_text, _, split_pos_list = create_mix_text_line(_shape, text_type=text_type)
+            
+            img_name = "text_line_%d.jpg" % i
+            save_path = os.path.join(text_line_imgs_dir, img_name)
+            PIL_text.save(save_path, format="jpeg")
+            fw.write(img_name + "\t" + json.dumps(split_pos_list) + "\n")
+            
+            if i % 50 == 0:
+                print("Process bar: %.2f%%" % (i * 100 / obj_num))
+                sys.stdout.flush()
+
+
+def generate_mix_text_line_tfrecords(obj_num=100, text_type="horizontal", text_shape=None):
+    text_type = check_text_type(text_type)
+    
+    if text_type == "h":
+        text_line_tfrecords_dir = MIX_TEXT_LINE_TFRECORDS_H
+    if text_type == "v":
+        text_line_tfrecords_dir = MIX_TEXT_LINE_TFRECORDS_V
+    
+    check_or_makedirs(text_line_tfrecords_dir)
+    
+    # 可以把生成的图片直接存入tfrecords文件
+    # 而不必将生成的图片先保存到磁盘，再从磁盘读取出来保存到tfrecords文件，这样效率太低
+    writers_list = \
+        [tf.io.TFRecordWriter(os.path.join(text_line_tfrecords_dir, "text_lines_%d.tfrecords" % i))
+         for i in range(20)]
+    
+    # 保存生成的文本图片
+    _shape = text_shape
+    for i in range(obj_num):
+        writer = random.choice(writers_list)
+        
+        if text_shape is None and text_type == "h":
+            _shape = (random.randint(54, 108), random.randint(720, 1280))
+        if text_shape is None and text_type == "v":
+            _shape = (random.randint(720, 1280), random.randint(54, 108))
+
+        PIL_text, _, split_pos_list = create_mix_text_line(_shape, text_type=text_type)
+        
+        bytes_image = PIL_text.tobytes()  # 将图片转化为原生bytes
+        split_positions = np.array(split_pos_list).tobytes()
+        
+        example = tf.train.Example(
+            features=tf.train.Features(
+                feature={
+                    'bytes_image': tf.train.Feature(bytes_list=tf.train.BytesList(value=[bytes_image])),
+                    'img_height': tf.train.Feature(int64_list=tf.train.Int64List(value=[PIL_text.height])),
+                    'img_width': tf.train.Feature(int64_list=tf.train.Int64List(value=[PIL_text.width])),
+                    'split_positions': tf.train.Feature(bytes_list=tf.train.BytesList(value=[split_positions]))
+                }))
+        writer.write(example.SerializeToString())
+        
+        if i % 50 == 0:
+            print("Process bar: %.2f%%" % (i * 100 / obj_num))
+            sys.stdout.flush()
+    
+    # 关闭所有的tfrecords写者
+    [writer.close() for writer in writers_list]
+    return
+
+
+def create_one_text_line(shape=(36, 720), text_type="horizontal"):
+    text_type = check_text_type(text_type)
+    check_text_line_shape(shape, text_type)
     text_h, text_w = shape
-    if type == "h":
-        assert text_h <= text_w, "Horizontal text must meet height <= width."
-    if type == "v":
-        assert text_h >= text_w, "Vertical text must meet height >= width."
     
     # 生成黑色背景
     np_text = np.zeros(shape=(text_h, text_w), dtype=np.uint8)
 
     # 横向排列
-    if type == "h":
+    if text_type == "h":
         # 随机决定字符间距占行距的比例
         char_spacing = (random.uniform(0.0, 0.05), random.uniform(0.0, 0.2))  # (高方向, 宽方向)
 
         # 生成一行汉字
         y1, y2 = 0, text_h -1
         x = 0
-        _, chinese_char_and_box_list, _ = generate_one_row_chars(x, y1, y2, text_w, np_text, char_spacing)
+        _, _, char_and_box_list, split_pos = generate_one_row_chars(x, y1, y2, text_w, np_text, char_spacing)
 
     # 纵向排列
     else:
@@ -153,7 +322,7 @@ def create_text_line(shape=(96, 480), type="horizontal"):
         # 生成一列汉字
         x1, x2 = 0, text_w - 1
         y = 0
-        _, chinese_char_and_box_list, _ = generate_one_col_chars(x1, x2, y, text_h, np_text, char_spacing)
+        _, _, char_and_box_list, split_pos = generate_one_col_chars(x1, x2, y, text_h, np_text, char_spacing)
     
     np_text = reverse_image_color(np_img=np_text)
     PIL_text = Image.fromarray(np_text)
@@ -162,13 +331,89 @@ def create_text_line(shape=(96, 480), type="horizontal"):
     # print(len(chinese_char_and_box_list))
     # PIL_text.show()
 
-    return PIL_text, chinese_char_and_box_list
+    return PIL_text, char_and_box_list, split_pos
+
+
+def create_two_text_line(shape=(64, 1280), text_type="horizontal"):
+    text_type = check_text_type(text_type)
+    check_text_line_shape(shape, text_type)
+    text_h, text_w = shape
+    
+    # 生成黑色背景
+    np_text = np.zeros(shape=(text_h, text_w), dtype=np.uint8)
+    
+    # 横向排列
+    if text_type == "h":
+        # 随机决定字符间距占行距的比例
+        char_spacing = (random.uniform(0.0, 0.05), random.uniform(0.0, 0.2))  # (高方向, 宽方向)
+        
+        # 生成两行汉字
+        y1, y2 = 0, text_h - 1
+        x = 0
+        _, text1_bbox, text2_bbox, split_pos = generate_two_rows_chars(x, y1, y2, text_w, np_text, char_spacing)
+    
+    # 纵向排列
+    else:
+        # 随机决定字符间距占列距的比例
+        char_spacing = (random.uniform(0.0, 0.2), random.uniform(0.0, 0.05))  # (高方向, 宽方向)
+        
+        # 生成两列汉字
+        x1, x2 = 0, text_w - 1
+        y = 0
+        _, text1_bbox, text2_bbox, split_pos = generate_two_cols_chars(x1, x2, y, text_h, np_text, char_spacing)
+    
+    np_text = reverse_image_color(np_img=np_text)
+    PIL_text = Image.fromarray(np_text)
+    
+    # print(chinese_char_and_box_list)
+    # print(len(chinese_char_and_box_list))
+    # PIL_text.show()
+    return PIL_text, text1_bbox, text2_bbox, split_pos
+
+
+def create_mix_text_line(shape=(64, 1280), text_type="horizontal"):
+    text_type = check_text_type(text_type)
+    check_text_line_shape(shape, text_type)
+    text_h, text_w = shape
+    
+    # 生成黑色背景
+    np_text = np.zeros(shape=(text_h, text_w), dtype=np.uint8)
+    
+    # 横向排列
+    if text_type == "h":
+        # 随机决定字符间距占行距的比例
+        char_spacing = (random.uniform(0.0, 0.05), random.uniform(0.0, 0.2))  # (高方向, 宽方向)
+        
+        # 生成单双行
+        y1, y2 = 0, text_h - 1
+        x = 0
+        _, text_bbox_list, split_pos = generate_mix_rows_chars(x, y1, y2, text_w, np_text, char_spacing)
+    
+    # 纵向排列
+    else:
+        # 随机决定字符间距占列距的比例
+        char_spacing = (random.uniform(0.0, 0.2), random.uniform(0.0, 0.05))  # (高方向, 宽方向)
+        
+        # 生成单双列
+        x1, x2 = 0, text_w - 1
+        y = 0
+        _, text_bbox_list, split_pos = generate_mix_cols_chars(x1, x2, y, text_h, np_text, char_spacing)
+    
+    np_text = reverse_image_color(np_img=np_text)
+    PIL_text = Image.fromarray(np_text)
+    
+    # print(chinese_char_and_box_list)
+    # print(len(chinese_char_and_box_list))
+    # PIL_text.show()
+    
+    return PIL_text, text_bbox_list, split_pos
 
 
 def generate_one_row_chars(x, y1, y2, length, np_background, char_spacing):
     # 记录下生成的汉字及其bounding-box
     char_and_box_list = []
 
+    row_end = x + length - 1
     row_height = y2 - y1 + 1
     while length >= row_height:
         chinese_char, bounding_box, x_tail = \
@@ -180,27 +425,41 @@ def generate_one_row_chars(x, y1, y2, length, np_background, char_spacing):
         x = x_tail
     
     # 获取文本行的bounding-box
-    head_x1, head_y1, head_x2, head_y2 = char_and_box_list[0][1]
-    tail_x1, tail_y1, tail_x2, tail_y2 = char_and_box_list[-1][1]
+    head_x1, head_y1, _, _ = char_and_box_list[0][1]
+    _, _, tail_x2, tail_y2 = char_and_box_list[-1][1]
     text_bbox = (head_x1, head_y1, tail_x2, tail_y2)
+    
+    # 获取字符之间的划分位置
+    char_spacing_w = round(row_height * char_spacing[1])
+    split_pos = [max(head_x1 - char_spacing_w, 0),]
+    for i in range(len(char_and_box_list)-1):
+        x_cent = (char_and_box_list[i][1][2] + char_and_box_list[i+1][1][0]) // 2
+        split_pos.append(x_cent)
+    split_pos.append(min(tail_x2 + char_spacing_w, row_end))
 
-    return x, char_and_box_list, text_bbox
+    return x, text_bbox, char_and_box_list, split_pos
 
 
 def generate_two_rows_chars(x, y1, y2, length, np_background, char_spacing):
     row_height = y2 - y1 + 1
     mid_y = y1 + round(row_height / 2)
 
-    x_1, _, text1_bbox = generate_one_row_chars(x, y1, mid_y, length, np_background, char_spacing)
-    x_2, _, text2_bbox = generate_one_row_chars(x, mid_y+1, y2, length, np_background, char_spacing)
+    x_1, text1_bbox, _, _ = generate_one_row_chars(x, y1, mid_y, length, np_background, char_spacing)
+    x_2, text2_bbox, _, _ = generate_one_row_chars(x, mid_y+1, y2, length, np_background, char_spacing)
 
-    return max(x_1, x_2), text1_bbox, text2_bbox
+    # 获取文本行之间的划分位置
+    center_val = (text1_bbox[3] + text2_bbox[1]) // 2
+    char_spacing_h = round(row_height * char_spacing[0])
+    split_pos = [max(text1_bbox[1] - char_spacing_h, y1), center_val, min(text2_bbox[3] + char_spacing_h, y2)]
+    
+    return max(x_1, x_2), text1_bbox, text2_bbox, split_pos
 
 
 def generate_one_col_chars(x1, x2, y, length, np_background, char_spacing):
     # 记录下生成的汉字及其bounding-box
     char_and_box_list = []
 
+    col_end = y + length - 1
     col_width = x2 - x1 + 1
     while length >= col_width:
         chinese_char, bounding_box, y_tail = \
@@ -212,21 +471,106 @@ def generate_one_col_chars(x1, x2, y, length, np_background, char_spacing):
         y = y_tail
 
     # 获取文本行的bounding-box
-    head_x1, head_y1, head_x2, head_y2 = char_and_box_list[0][1]
-    tail_x1, tail_y1, tail_x2, tail_y2 = char_and_box_list[-1][1]
+    head_x1, head_y1, _, _ = char_and_box_list[0][1]
+    _, _, tail_x2, tail_y2 = char_and_box_list[-1][1]
     text_bbox = (head_x1, head_y1, tail_x2, tail_y2)
 
-    return y, char_and_box_list, text_bbox
+    # 获取字符之间的划分位置
+    char_spacing_h = round(col_width * char_spacing[0])
+    split_pos = [max(head_y1 - char_spacing_h, 0), ]
+    for i in range(len(char_and_box_list) - 1):
+        x_cent = (char_and_box_list[i][1][3] + char_and_box_list[i + 1][1][1]) // 2
+        split_pos.append(x_cent)
+    split_pos.append(min(tail_y2 + char_spacing_h, col_end))
+
+    return y, text_bbox, char_and_box_list, split_pos
 
 
 def generate_two_cols_chars(x1, x2, y, length, np_background, char_spacing):
     col_width = x2 - x1 + 1
     mid_x = x1 + round(col_width / 2)
+    
+    y_1, text1_bbox, _, _ = generate_one_col_chars(x1, mid_x, y, length, np_background, char_spacing)
+    y_2, text2_bbox, _, _ = generate_one_col_chars(mid_x+1, x2, y, length, np_background, char_spacing)
 
-    y_1, _, text1_box = generate_one_col_chars(x1, mid_x, y, length, np_background, char_spacing)
-    y_2, _, text2_box = generate_one_col_chars(mid_x+1, x2, y, length, np_background, char_spacing)
+    # 获取文本行之间的划分位置
+    center_val = (text1_bbox[2] + text2_bbox[0]) // 2
+    char_spacing_w = round(col_width * char_spacing[1])
+    split_pos = [max(text1_bbox[0]-char_spacing_w, x1), center_val, min(text2_bbox[2]+char_spacing_w, x2)]
 
-    return max(y_1, y_2), text1_box, text2_box
+    return max(y_1, y_2), text1_bbox, text2_bbox, split_pos
+
+
+def generate_mix_rows_chars(x, y1, y2, row_length, np_background, char_spacing):
+    row_height =  y2 - y1 + 1
+    x_start = x
+    
+    text_bbox_list = []
+    head_tail_list = []
+    flag = 0 if random.random() < 0.6 else 1  # 以单行字串还是双行字串开始
+    remaining_len = row_length
+    while remaining_len >= row_height:
+        # 随机决定接下来的字串长度（这是大约数值，实际可能比它小,也可能比它大）
+        length = random.randint(row_height, remaining_len)
+        flag += 1
+        if flag % 2 == 1:
+            x, text_bbox, _, _ = generate_one_row_chars(x, y1, y2, length, np_background, char_spacing)
+            text_bbox_list.append(text_bbox)
+            head_tail_list.append((text_bbox[0], text_bbox[2]))
+        else:
+            x, text1_bbox, text2_bbox, _ = generate_two_rows_chars(x, y1, y2, length, np_background, char_spacing)
+            text_bbox_list.extend([text1_bbox, text2_bbox])
+            head_tail_list.append((min(text1_bbox[0], text2_bbox[0]), max(text1_bbox[2], text2_bbox[2])))
+        remaining_len = row_length - (x - x_start)
+    
+    # pure_two_lines = True if len(text_bbox_list) == 2 else False    # 1,2,1,2,... or 2,1,2,1,...
+    
+    # 获取单双行的划分位置
+    char_spacing_w = round(row_height * char_spacing[1])
+    head_x1, tail_x2 = head_tail_list[0][0], head_tail_list[-1][1]
+    split_pos = [max(head_x1 - char_spacing_w, x_start),]
+    for i in range(len(head_tail_list)-1):
+        x_cent = (head_tail_list[i][1] + head_tail_list[i+1][0]) // 2
+        split_pos.append(x_cent)
+    split_pos.append(min(tail_x2+char_spacing_w, x_start+row_length-1))
+    
+    return x, text_bbox_list, split_pos
+
+
+def generate_mix_cols_chars(x1, x2, y, col_length, np_background, char_spacing):
+    col_width = x2 - x1 + 1
+    y_start = y
+    
+    text_bbox_list = []
+    head_tail_list = []
+    flag = 0 if random.random() < 0.6 else 1  # 以单行字串还是双行字串开始
+    remaining_len = col_length
+    while remaining_len >= col_width:
+        # 随机决定接下来的字串长度（这是大约数值，实际可能比它小,也可能比它大）
+        length = random.randint(col_width, remaining_len)
+        flag += 1
+        if flag % 2 == 1:
+            y, text_bbox, _, _ = generate_one_col_chars(x1, x2, y, length, np_background, char_spacing)
+            text_bbox_list.append(text_bbox)
+            head_tail_list.append((text_bbox[1], text_bbox[3]))
+        else:
+            y, text1_bbox, text2_bbox, _ = generate_two_cols_chars(x1, x2, y, length, np_background, char_spacing)
+            text_bbox_list.extend([text1_bbox, text2_bbox])
+            head_tail_list.append((min(text1_bbox[1], text2_bbox[1]), max(text1_bbox[3], text2_bbox[3])))
+        remaining_len = col_length - (y - y_start)
+
+    # pure_two_lines = True if len(text_bbox_list) == 2 else False    # 1,2,1,2,... or 2,1,2,1,...
+    
+    # 获取单双行的划分位置
+    char_spacing_h = round(col_width * char_spacing[0])
+    head_y1, tail_y2 = head_tail_list[0][0], head_tail_list[-1][1]
+    split_pos = [max(head_y1 - char_spacing_h, y_start), ]
+    for i in range(len(head_tail_list) - 1):
+        y_cent = (head_tail_list[i][1] + head_tail_list[i + 1][0]) // 2
+        split_pos.append(y_cent)
+    split_pos.append(min(tail_y2 + char_spacing_h, y_start + col_length - 1))
+    
+    return y, text_bbox_list, split_pos
 
 
 def generate_char_img_into_unclosed_box(np_background, x1, y1, x2=None, y2=None, char_spacing=(0.05, 0.05)):
@@ -387,7 +731,7 @@ def chinese_char_img_generator_using_image():
     while True:
         total = len(calligraphy_categories_list)
         count = 0
-        for font_type, image_paths_list in get_external_image_paths(root_dir=EXTERNEL_IMAGES_DIR):
+        for font_text_type, image_paths_list in get_external_image_paths(root_dir=EXTERNEL_IMAGES_DIR):
             count += 1
             print("Char image generator: %d of %d" % (count, total))
             
@@ -436,7 +780,8 @@ def display_tfrecords(tfrecords_file):
                 'img_width': tf.io.FixedLenFeature([], tf.int64),
                 'bytes_chars': tf.io.FixedLenFeature([], tf.string),
                 'labels': tf.io.FixedLenFeature([], tf.string),
-                'gt_boxes': tf.io.FixedLenFeature([], tf.string)
+                'gt_boxes': tf.io.FixedLenFeature([], tf.string),
+                "split_positions": tf.io.FixedLenFeature([], tf.string)
             })
     
     data_set = data_set.map(parse_func)
@@ -461,11 +806,21 @@ def display_tfrecords(tfrecords_file):
 
 
 if __name__ == '__main__':
-    generate_text_line_imgs(obj_num=100, type="horizontal")
-    generate_text_line_imgs(obj_num=100, type="vertical")
-    # generate_text_line_tfrecords(obj_num=100, type="horizontal")
-    # generate_text_line_tfrecords(obj_num=100, type="vertical")
+    generate_one_text_line_imgs(obj_num=100, text_type="horizontal")
+    generate_one_text_line_imgs(obj_num=100, text_type="vertical")
+    generate_one_text_line_tfrecords(obj_num=100, text_type="horizontal")
+    generate_one_text_line_tfrecords(obj_num=100, text_type="vertical")
+
+    generate_two_text_line_imgs(obj_num=100, text_type="horizontal")
+    generate_two_text_line_imgs(obj_num=100, text_type="vertical")
+    generate_two_text_line_tfrecords(obj_num=100, text_type="horizontal")
+    generate_two_text_line_tfrecords(obj_num=100, text_type="vertical")
+
+    generate_mix_text_line_imgs(obj_num=100, text_type="horizontal")
+    generate_mix_text_line_imgs(obj_num=100, text_type="vertical")
+    generate_mix_text_line_tfrecords(obj_num=100, text_type="horizontal")
+    generate_mix_text_line_tfrecords(obj_num=100, text_type="vertical")
     
-    # display_tfrecords(os.path.join(TEXT_LINE_TFRECORDS_H, "text_lines_0.tfrecords"))
+    # display_tfrecords(os.path.join(ONE_TEXT_LINE_TFRECORDS_H, "text_lines_0.tfrecords"))
     
     print("Done !")
