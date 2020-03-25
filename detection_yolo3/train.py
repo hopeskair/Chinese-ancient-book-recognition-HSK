@@ -26,14 +26,11 @@ def train(data_file, src_type, model_struc="densenet", weigths_path="", freeze_b
     num_classes = len(BOX_CLASSES_ON_BOOK)
     anchors = get_anchors(anchors_path=YOLO3_ANCHORS_FILE)
 
-    summary_writer = tf.summary.create_file_writer(YOLO3_LOGS_DIR)
-    with summary_writer.as_default():
-        load_pretrained = True if os.path.exists(weigths_path) else False
-        model = create_model(anchors, num_classes, model_struc,
-                             load_pretrained=load_pretrained,
-                             weights_path=weigths_path,
-                             freeze_body=freeze_body)  # make sure you know what you freeze
-        summary_writer.flush()
+    load_pretrained = True if os.path.exists(weigths_path) else False
+    model = create_model(anchors, num_classes, model_struc,
+                         load_pretrained=load_pretrained,
+                         weights_path=weigths_path,
+                         freeze_body=freeze_body)  # make sure you know what you freeze
     
     logging = callbacks.TensorBoard(log_dir=YOLO3_LOGS_DIR)
     ckpt_path = os.path.join(YOLO3_CKPT_DIR, "ep{epoch:05d}-loss{loss:.3f}-val_loss{val_loss:.3f}.h5")
@@ -114,21 +111,6 @@ def create_model(anchors,
     
     model_body = yolo_body(image_input, num_anchors//3, num_classes, model_struc)
     print("Create YOLOv3 model with {} anchors and {} classes.".format(num_anchors, num_classes))
-
-    # 处理模型的输出，提取模型的预测结果。注意这里的设定：一个batch只包含一张图片
-    model_outs = [y_out[0] for y_out in model_body.outputs]
-    boxes, scores, classes = layers.Lambada(yolo_eval, name='yolo_eval',
-                                            arguments={'anchors': anchors,
-                                                       'num_classes': num_classes,
-                                                       'score_thresh': YOLO3_CLASS_SCORE_THRESH,
-                                                       'iou_thresh': YOLO3_NMS_IOU_THRESH,
-                                                       'max_boxes': YOLO3_NMS_MAX_BOXES_NUM}
-                                            )(model_outs)
-    img_with_boxes = tf.py_function(func=draw_boxes,
-                                    inp=[image_input[0], boxes, scores, classes],
-                                    Tout=tf.uint8)
-    img_with_boxes = backend.expand_dims(img_with_boxes, axis=0)
-    tf.summary.image(name="img_with_boxes", data=img_with_boxes)
     
     # 加载预训练模型
     if load_pretrained:

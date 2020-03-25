@@ -6,7 +6,7 @@ import os
 
 # ************************ basic configuration ***************************
 # os.getcwd() returns the current working directory
-CURR_DIR = os.path.dirname(__file__).replace("/", os.sep)
+CURR_DIR = os.path.dirname(__file__)    # .replace("/", os.sep)
 CHINESE_LABEL_FILE = os.path.join(CURR_DIR, "chinese_labels", "chinese_labels_simplified_level1.txt")
 IGNORABLE_CHARS_FILE = os.path.join(CURR_DIR, "chinese_labels", "ignorable_chars.txt")
 IMPORTANT_CHARS_FILE = os.path.join(CURR_DIR, "chinese_labels", "important_chars.txt")
@@ -75,6 +75,14 @@ BOOK_PAGE_MAX_GT_BOXES = 1500
 
 # text line recognition crnn
 BATCH_SIZE_TEXT_LINE = 8
+
+# 训练超参数
+INIT_LEARNING_RATE = 0.01
+SGD_LEARNING_MOMENTUM = 0.9
+SGD_GRADIENT_CLIP_NORM = 5.0
+
+# 权重衰减
+L2_WEIGHT_DECAY = 0.0005,
 # ************************* Commonly used ********************************
 
 
@@ -152,3 +160,128 @@ CTPN_TEXT_LINE_NMS_THRESH = 0.3
 CRNN_CKPT_DIR = os.path.join(CURR_DIR, "recognition_crnn", "ckpt")
 CRNN_LOGS_DIR = os.path.join(CURR_DIR, "recognition_crnn", "logs")
 # **************************** Model crnn ********************************
+
+
+# ************************** Segment model *******************************
+SEGMENT_BOOK_PAGE_ROOT_DIR = os.path.join(CURR_DIR, "segment_book_page")
+SEGMENT_BOOK_PAGE_CKPT_DIR = os.path.join(CURR_DIR, "segment_book_page", "ckpt")
+SEGMENT_BOOK_PAGE_LOGS_DIR = os.path.join(CURR_DIR, "segment_book_page", "logs")
+SEGMENT_BOOK_PAGE_TAGS_FILE_H = os.path.join(CURR_DIR, "segment_book_page", "book_page_tags_h.txt")
+SEGMENT_BOOK_PAGE_TAGS_FILE_V = os.path.join(CURR_DIR, "segment_book_page", "book_page_tags_v.txt")
+SEGMENT_BOOK_PAGE_TFRECORDS_H = os.path.join(CURR_DIR, "segment_book_page", "book_page_tfrecords_h.txt")
+SEGMENT_BOOK_PAGE_TFRECORDS_V = os.path.join(CURR_DIR, "segment_book_page", "book_page_tfrecords_v.txt")
+
+SEGMENT_TEXT_LINE_ROOT_DIR = os.path.join(CURR_DIR, "segment_text_line")
+SEGMENT_TEXT_LINE_CKPT_DIR = os.path.join(CURR_DIR, "segment_text_line", "ckpt")
+SEGMENT_TEXT_LINE_LOGS_DIR = os.path.join(CURR_DIR, "segment_text_line", "logs")
+SEGMENT_TEXT_LINE_TAGS_FILE_H = os.path.join(CURR_DIR, "segment_text_line", "text_line_tags_h.txt")
+SEGMENT_TEXT_LINE_TAGS_FILE_V = os.path.join(CURR_DIR, "segment_text_line", "text_line_tags_v.txt")
+SEGMENT_TEXT_LINE_TFRECORDS_H = os.path.join(CURR_DIR, "segment_text_line", "text_line_tfrecords_h.txt")
+SEGMENT_TEXT_LINE_TFRECORDS_V = os.path.join(CURR_DIR, "segment_text_line", "text_line_tfrecords_v.txt")
+
+SEGMENT_MIXED_LINE_ROOT_DIR = os.path.join(CURR_DIR, "segment_mixed_line")
+SEGMENT_MIXED_LINE_CKPT_DIR = os.path.join(CURR_DIR, "segment_mixed_line", "ckpt")
+SEGMENT_MIXED_LINE_LOGS_DIR = os.path.join(CURR_DIR, "segment_mixed_line", "logs")
+SEGMENT_MIXED_LINE_TAGS_FILE_H = os.path.join(CURR_DIR, "segment_mixed_line", "mixed_line_tags_h.txt")
+SEGMENT_MIXED_LINE_TAGS_FILE_V = os.path.join(CURR_DIR, "segment_mixed_line", "mixed_line_tags_v.txt")
+SEGMENT_MIXED_LINE_TFRECORDS_H = os.path.join(CURR_DIR, "segment_mixed_line", "mixed_line_tfrecords_h.txt")
+SEGMENT_MIXED_LINE_TFRECORDS_V = os.path.join(CURR_DIR, "segment_mixed_line", "mixed_line_tfrecords_v.txt")
+
+SEGMENT_DOUBLE_LINE_ROOT_DIR = os.path.join(CURR_DIR, "segment_double_line")
+SEGMENT_DOUBLE_LINE_CKPT_DIR = os.path.join(CURR_DIR, "segment_double_line", "ckpt")
+SEGMENT_DOUBLE_LINE_LOGS_DIR = os.path.join(CURR_DIR, "segment_double_line", "logs")
+SEGMENT_DOUBLE_LINE_TAGS_FILE_H = os.path.join(CURR_DIR, "segment_double_line", "double_line_tags_h.txt")
+SEGMENT_DOUBLE_LINE_TAGS_FILE_V = os.path.join(CURR_DIR, "segment_double_line", "double_line_tags_v.txt")
+SEGMENT_DOUBLE_LINE_TFRECORDS_H = os.path.join(CURR_DIR, "segment_double_line", "double_line_tfrecords_h.txt")
+SEGMENT_DOUBLE_LINE_TFRECORDS_V = os.path.join(CURR_DIR, "segment_double_line", "double_line_tfrecords_v.txt")
+
+SEGMENT_ROOT_DIR = {
+    "book_page": SEGMENT_BOOK_PAGE_ROOT_DIR,
+    "double_line": SEGMENT_DOUBLE_LINE_ROOT_DIR,
+    "mix_line": SEGMENT_MIXED_LINE_ROOT_DIR,
+    "text_line": SEGMENT_TEXT_LINE_ROOT_DIR
+}
+
+SEGMENT_CKPT_DIR = {
+    "book_page": SEGMENT_BOOK_PAGE_CKPT_DIR,
+    "double_line": SEGMENT_DOUBLE_LINE_CKPT_DIR,
+    "mix_line": SEGMENT_MIXED_LINE_CKPT_DIR,
+    "text_line": SEGMENT_TEXT_LINE_CKPT_DIR
+}
+
+SEGMENT_LOGS_DIR = {
+    "book_page": SEGMENT_BOOK_PAGE_LOGS_DIR,
+    "double_line": SEGMENT_DOUBLE_LINE_LOGS_DIR,
+    "mix_line": SEGMENT_MIXED_LINE_LOGS_DIR,
+    "text_line": SEGMENT_TEXT_LINE_LOGS_DIR
+}
+
+
+SEGMENT_TASK_ID = {
+    "book_page": 0,
+    "mix_line": 1,
+    "double_line": 2,
+    "text_line": 3
+}
+
+SEGMENT_ID_TO_TASK = {
+    0: "book_page",
+    1: "mix_line",
+    2: "double_line",
+    3: "text_line"
+}
+
+SEGMENT_BATCH_SIZE = {
+    "book_page": 4,
+    "mix_line": 32,
+    "double_line": 32,
+    "text_line": 32
+}
+
+SEGMENT_MAX_INCLINATION = {
+    "book_page": 28,
+    "mix_line": 12,
+    "double_line": 12,
+    "text_line": 8
+}
+
+SEGMENT_FIXED_HEIGHT = {
+    "book_page": 560,
+    "mix_line": 96,
+    "double_line": 256,
+    "text_line": 64
+}
+
+SEGMENT_FEATURE_STRIDE = {
+    "book_page": 16,
+    "mix_line": 16,
+    "double_line": 16,
+    "text_line": 16
+}
+
+SEGMENT_CLS_SCORE_THRESH = {
+    "book_page": 0.7,
+    "mix_line": 0.7,
+    "double_line": 0.7,
+    "text_line": 0.7
+}
+
+SEGMENT_DISTANCE_THRESH = {
+    "book_page": 16,
+    "mix_line": 16,
+    "double_line": 16,
+    "text_line": 16
+}
+
+SEGMENT_NMS_MAX_OUTPUTS = {
+    "book_page": 20,
+    "mix_line": 10,
+    "double_line": 3,
+    "text_line": 80
+}
+
+SEGMENT_LOSS_WEIGHTS = {
+    "segment_class_loss": 1.,
+    "segment_regress_loss": 1.
+}
+# ************************** Segment model *******************************

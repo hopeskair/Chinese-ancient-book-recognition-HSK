@@ -135,3 +135,35 @@ def DenseNet73_for_yolo(inputs, scope="densenet"):
             features_list.append(feat)
         
     return features_list
+
+
+def DenseNet60_segment_book_page(inputs, feat_stride=16, scope="densenet"): # 60 or 65
+    blocks = [3, 9, 8, 8] if feat_stride == 16 else [3, 9, 8, 8, 2]
+    with backend.name_scope(scope):
+        outputs = DenseNet(inputs, blocks=blocks)  # 1/16 or 1/32
+        # outputs = DenseNet(inputs, blocks=[1, 1, 1, 1])  # for test
+    return outputs
+
+
+def DenseNet36_segment_text_line(inputs, feat_stride=16, scope="densenet"): # 36 or 39
+    blocks = [3, 5, 4, 4] if feat_stride == 16 else [3, 4, 4, 4, 2]
+    with backend.name_scope(scope):
+        outputs = DenseNet(inputs, blocks=blocks)  # 1/16 or 1/32
+        # outputs = DenseNet(inputs, blocks=[1, 1, 1, 1])  # for test
+    return outputs
+
+
+def DenseNet36_segment_mix_line(inputs, feat_stride=16, scope="densenet"): # 36 or 39
+    blocks = [3, 5, 4, 4] if feat_stride == 16 else [3, 4, 4, 4, 2]
+    with backend.name_scope(scope):
+        outputs = DenseNet(inputs, blocks=blocks)  # 1/16 or 1/32
+        # outputs = DenseNet(inputs, blocks=[1, 1, 1, 1])  # for test
+    return outputs
+
+
+def DenseNet36_segment_double_line(inputs, feat_stride=16, scope="densenet"): # 36 or 39
+    blocks = [3, 5, 4, 4] if feat_stride == 16 else [3, 4, 4, 4, 2]
+    with backend.name_scope(scope):
+        outputs = DenseNet(inputs, blocks=blocks)  # 1/16 or 1/32
+        # outputs = DenseNet(inputs, blocks=[1, 1, 1, 1])  # for test
+    return outputs

@@ -195,3 +195,59 @@ def ResNet76V2_for_yolo(inputs, scope="resnet"):
             features_list.append(feat)
     
     return features_list
+
+
+def ResNet64V2_segment_book_page(inputs, feat_stride=16, scope="resnet"):
+    def stack_fn(x):
+        x = stack2(x, 64, 3, name='conv2')
+        x = stack2(x, 128, 8, name='conv3')  # 1/8 size
+        x = stack2(x, 256, 8, name='conv4')  # 1/16 size
+        x = stack2(x, 512, 2, stride1=feat_stride//16, name='conv5')  # 1/16 or 1/32
+        return x
+    
+    with backend.name_scope(scope):
+        outputs = ResNet(inputs, stack_fn, use_bias=True, block_preact=True)
+    
+    return outputs
+
+
+def ResNet40V2_segment_text_line(inputs, feat_stride=16, scope="resnet"):
+    def stack_fn(x):
+        x = stack2(x, 64, 3, name='conv2')
+        x = stack2(x, 128, 4, name='conv3')  # 1/8 size
+        x = stack2(x, 256, 4, name='conv4')  # 1/16 size
+        x = stack2(x, 512, 2, stride1=feat_stride//16, name='conv5')  # 1/16 or 1/32
+        return x
+    
+    with backend.name_scope(scope):
+        outputs = ResNet(inputs, stack_fn, use_bias=True, block_preact=True)
+    
+    return outputs
+
+
+def ResNet40V2_segment_mix_line(inputs, feat_stride=16, scope="resnet"):
+    def stack_fn(x):
+        x = stack2(x, 64, 3, name='conv2')
+        x = stack2(x, 128, 4, name='conv3')  # 1/8 size
+        x = stack2(x, 256, 4, name='conv4')  # 1/16 size
+        x = stack2(x, 512, 2, stride1=feat_stride//16, name='conv5')  # 1/16 or 1/32
+        return x
+    
+    with backend.name_scope(scope):
+        outputs = ResNet(inputs, stack_fn, use_bias=True, block_preact=True)
+    
+    return outputs
+
+
+def ResNet40V2_segment_double_line(inputs, feat_stride=16, scope="resnet"):
+    def stack_fn(x):
+        x = stack2(x, 64, 3, name='conv2')
+        x = stack2(x, 128, 4, name='conv3')  # 1/8 size
+        x = stack2(x, 256, 4, name='conv4')  # 1/16 size
+        x = stack2(x, 512, 2, stride1=feat_stride//16, name='conv5')  # 1/16 or 1/32
+        return x
+    
+    with backend.name_scope(scope):
+        outputs = ResNet(inputs, stack_fn, use_bias=True, block_preact=True)
+    
+    return outputs

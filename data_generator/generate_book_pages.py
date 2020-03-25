@@ -39,12 +39,12 @@ def generate_book_page_imgs(obj_num=10, text_type="horizontal", page_shape=None)
                 _shape = (random.randint(640, 960), random.randint(480, 720))
 
             PIL_page, text_bbox_list, split_pos_list = create_book_page(_shape, text_type=text_type)
-            # PIL_page = PIL_page.convert("L")
+            image_tags = {"text_bbox_list": text_bbox_list, "split_pos_list": split_pos_list}
             
             img_name = "book_page_%d.jpg" % i
             save_path = os.path.join(book_page_imgs_dir, img_name)
             PIL_page.save(save_path, format="jpeg")
-            fw.write(img_name + "\t" + json.dumps(text_bbox_list) + "\t" + json.dumps(split_pos_list) + "\n")
+            fw.write(img_name + "\t" + json.dumps(image_tags) + "\n")
             
             if i % 50 == 0:
                 print("Process bar: %.2f%%" % (i*100/obj_num))

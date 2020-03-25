@@ -69,11 +69,12 @@ def generate_one_text_line_imgs(obj_num=100, text_type="horizontal", text_shape=
                 _shape = (random.randint(540, 960), random.randint(36, 64))
 
             PIL_text, char_and_box_list, split_pos_list = create_one_text_line(_shape, text_type=text_type)
+            image_tags = {"char_and_box_list": char_and_box_list, "split_pos_list": split_pos_list}
             
             img_name = "text_line_%d.jpg" % i
             save_path = os.path.join(text_line_imgs_dir, img_name)
             PIL_text.save(save_path, format="jpeg")
-            fw.write(img_name + "\t" + json.dumps(char_and_box_list) + "\t" + json.dumps(split_pos_list) + "\n")
+            fw.write(img_name + "\t" + json.dumps(image_tags) + "\n")
 
             if i % 50 == 0:
                 print("Process bar: %.2f%%" % (i*100/obj_num))
@@ -107,7 +108,7 @@ def generate_one_text_line_tfrecords(obj_num=100, text_type="horizontal", text_s
             _shape = (random.randint(540, 960), random.randint(36, 64))
         
         PIL_text, char_and_box_list, split_pos_list = create_one_text_line(_shape, text_type=text_type)
-
+        
         bytes_image = PIL_text.tobytes()  # 将图片转化为原生bytes
         bytes_chars = "".join([chinese_char for chinese_char, gt_box in char_and_box_list]).encode("utf-8")
         labels = np.array([CHAR2ID_DICT[char] for char, gt_box in char_and_box_list], dtype=np.int32).tobytes()
@@ -155,11 +156,12 @@ def generate_two_text_line_imgs(obj_num=100, text_type="horizontal", text_shape=
                 _shape = (random.randint(96, 640), random.randint(56, 108)) # 双行文本数据无需太长
 
             PIL_text, _, _, split_pos_list = create_two_text_line(_shape, text_type=text_type)
+            image_tags = {"split_pos_list": split_pos_list}
             
             img_name = "text_line_%d.jpg" % i
             save_path = os.path.join(text_line_imgs_dir, img_name)
             PIL_text.save(save_path, format="jpeg")
-            fw.write(img_name + "\t" + json.dumps(split_pos_list) + "\n")
+            fw.write(img_name + "\t" + json.dumps(image_tags) + "\n")
             
             if i % 50 == 0:
                 print("Process bar: %.2f%%" % (i * 100 / obj_num))
@@ -235,11 +237,12 @@ def generate_mix_text_line_imgs(obj_num=100, text_type="horizontal", text_shape=
                 _shape = (random.randint(720, 1280), random.randint(54, 108))
 
             PIL_text, _, split_pos_list = create_mix_text_line(_shape, text_type=text_type)
+            image_tags = {"split_pos_list": split_pos_list}
             
             img_name = "text_line_%d.jpg" % i
             save_path = os.path.join(text_line_imgs_dir, img_name)
             PIL_text.save(save_path, format="jpeg")
-            fw.write(img_name + "\t" + json.dumps(split_pos_list) + "\n")
+            fw.write(img_name + "\t" + json.dumps(image_tags) + "\n")
             
             if i % 50 == 0:
                 print("Process bar: %.2f%%" % (i * 100 / obj_num))
@@ -806,20 +809,20 @@ def display_tfrecords(tfrecords_file):
 
 
 if __name__ == '__main__':
-    generate_one_text_line_imgs(obj_num=100, text_type="horizontal")
-    generate_one_text_line_imgs(obj_num=100, text_type="vertical")
-    generate_one_text_line_tfrecords(obj_num=100, text_type="horizontal")
-    generate_one_text_line_tfrecords(obj_num=100, text_type="vertical")
-
-    generate_two_text_line_imgs(obj_num=100, text_type="horizontal")
-    generate_two_text_line_imgs(obj_num=100, text_type="vertical")
-    generate_two_text_line_tfrecords(obj_num=100, text_type="horizontal")
-    generate_two_text_line_tfrecords(obj_num=100, text_type="vertical")
-
-    generate_mix_text_line_imgs(obj_num=100, text_type="horizontal")
-    generate_mix_text_line_imgs(obj_num=100, text_type="vertical")
-    generate_mix_text_line_tfrecords(obj_num=100, text_type="horizontal")
-    generate_mix_text_line_tfrecords(obj_num=100, text_type="vertical")
+    # generate_one_text_line_imgs(obj_num=100, text_type="horizontal")
+    # generate_one_text_line_imgs(obj_num=100, text_type="vertical")
+    # generate_one_text_line_tfrecords(obj_num=100, text_type="horizontal")
+    # generate_one_text_line_tfrecords(obj_num=100, text_type="vertical")
+    #
+    # generate_two_text_line_imgs(obj_num=100, text_type="horizontal")
+    # generate_two_text_line_imgs(obj_num=100, text_type="vertical")
+    # generate_two_text_line_tfrecords(obj_num=100, text_type="horizontal")
+    # generate_two_text_line_tfrecords(obj_num=100, text_type="vertical")
+    #
+    # generate_mix_text_line_imgs(obj_num=100, text_type="horizontal")
+    # generate_mix_text_line_imgs(obj_num=100, text_type="vertical")
+    # generate_mix_text_line_tfrecords(obj_num=100, text_type="horizontal")
+    # generate_mix_text_line_tfrecords(obj_num=100, text_type="vertical")
     
     # display_tfrecords(os.path.join(ONE_TEXT_LINE_TFRECORDS_H, "text_lines_0.tfrecords"))
     
