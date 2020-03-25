@@ -233,8 +233,8 @@ SEGMENT_ID_TO_TASK = {
 
 SEGMENT_BATCH_SIZE = {
     "book_page": 4,
-    "mix_line": 4,
-    "double_line": 32,
+    "mix_line": 12,
+    "double_line": 16,
     "text_line": 32
 }
 
@@ -281,7 +281,12 @@ SEGMENT_NMS_MAX_OUTPUTS = {
 }
 
 SEGMENT_LOSS_WEIGHTS = {
-    "segment_class_loss": 1.,
+    "segment_class_loss": 5.,
     "segment_regress_loss": 1.
+}
+
+SEGMENT_LINE_WEIGHTS = {
+    "split_line": 200.,
+    "other_space": 1.
 }
 # ************************** Segment model *******************************

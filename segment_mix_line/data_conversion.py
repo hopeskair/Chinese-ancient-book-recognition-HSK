@@ -46,7 +46,7 @@ def check_tags(tags_file, segment_task, text_type):
     check_or_makedirs(save_path)
     
     for i, line in enumerate(lines):
-        np_img, split_pos = get_image_and_split_pos(line)
+        np_img, split_pos = get_image_and_split_pos(line, segment_task="mix_line")
 
         text_type = text_type[0].lower()
         if (segment_task, text_type) in (("book_page", "h"), ("double_line", "h"), ("text_line", "v"), ("mix_line", "v")):

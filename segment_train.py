@@ -6,7 +6,7 @@ from segment_mix_line.train import main as mix_line_train
 
 
 if __name__ == '__main__':
-    book_page_train()
-    # mix_line_train()
+    # book_page_train()
+    mix_line_train()
     
     print("Done !")

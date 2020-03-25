@@ -227,7 +227,7 @@ def adjust_img_to_fixed_height_tf(img_tensor, split_positions, fixed_h=560, segm
     return img_tensor, split_positions
 
 
-def get_image_and_split_pos(annotation_line):
+def get_image_and_split_pos(annotation_line, segment_task="book_page"):
     line = annotation_line.split("\t")
     PIL_img = Image.open(line[0])
     
@@ -235,6 +235,8 @@ def get_image_and_split_pos(annotation_line):
     split_pos = json.loads(line[1])["split_pos_list"]
     split_pos = np.array(split_pos, dtype=np.float32)
     split_pos.sort()    # 排序
+    if segment_task in ("double_line",):
+        split_pos = split_pos[1: -1] # 首尾的切分线不需要学习
     split_pos = np.tile(split_pos[:, np.newaxis], reps=(1, 2))
     
     return np_img, split_pos
@@ -284,7 +286,7 @@ def data_generator_with_images(annotation_lines,
         split_pos_list = []
         for _ in range(batch_size):
             if i == 0: np.random.shuffle(annotation_lines)
-            np_img, split_positions = get_image_and_split_pos(annotation_lines[i])
+            np_img, split_positions = get_image_and_split_pos(annotation_lines[i], segment_task)
             np_img, split_positions, _ = adjust_img_to_fixed_height(np_img, split_positions, fixed_h, segment_task, text_type)
             images_list.append(np_img)
             split_pos_list.append(split_positions)
@@ -352,6 +354,8 @@ def data_generator_with_tfrecords(tfrecords_files,
         split_positions = tf.reshape(split_positions, shape=(-1,))
         order_indices = tf.argsort(split_positions, axis=0)         # 排序
         split_positions = tf.gather(split_positions, order_indices) # 排序
+        if segment_task in ("double_line",):
+            split_positions = split_positions[1: -1]    # 首尾的切分线不需要学习
         split_positions = tf.tile(split_positions[:, tf.newaxis], multiples=[1, 2])
         split_positions = tf.cast(split_positions, tf.float32)
 

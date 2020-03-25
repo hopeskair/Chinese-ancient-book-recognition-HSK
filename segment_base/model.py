@@ -28,6 +28,7 @@ from .utils import get_segment_task_params, get_segment_task_thresh
 from config import INIT_LEARNING_RATE
 from config import SGD_LEARNING_MOMENTUM, SGD_GRADIENT_CLIP_NORM
 from config import SEGMENT_LOSS_WEIGHTS, L2_WEIGHT_DECAY
+from config import SEGMENT_LINE_WEIGHTS
 
 
 def CNN(segment_task, cnn_type="densenet"):
@@ -108,6 +109,9 @@ def work_net(stage="train", segment_task="book_page", text_type="horizontal", mo
     feat_width = layers.Lambda(lambda x: K.shape(x)[2]//feat_stride)(batch_images)
     real_features_width = layers.Lambda(lambda x: x/feat_stride)(real_images_width)
     targets = SegmentTarget(feat_stride=feat_stride,
+                            pos_weight=SEGMENT_LINE_WEIGHTS["split_line"],
+                            neg_weight=SEGMENT_LINE_WEIGHTS["other_space"],
+                            pad_weight=0.2,
                             name='segment_target'
                             )([split_lines_pos, feat_width, real_features_width])
 
