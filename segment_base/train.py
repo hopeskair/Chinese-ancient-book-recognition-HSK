@@ -25,7 +25,7 @@ def main(data_file, src_type, text_type, segment_task, epochs, init_epochs=0, mo
     train_model.summary()
     
     # load model
-    load_path = os.path.join(ckpt_dir, model_struc + "_ctpn_{:04d}.h5".format(init_epochs))
+    load_path = os.path.join(ckpt_dir, segment_task + "_segment_" + model_struc + "_{:04d}.h5".format(init_epochs))
     weights_path = weights_path if os.path.exists(weights_path) else load_path
     if os.path.exists(weights_path):
         train_model.load_weights(load_path, by_name=True)
@@ -51,12 +51,13 @@ def main(data_file, src_type, text_type, segment_task, epochs, init_epochs=0, mo
                                   max_queue_size=100)
         
         for i in range(5):  # 汇总图片
-            summary_images = val_model.predict_on_batch(x=validation_generator)
+            x = next(validation_generator) if src_type == "images" else validation_generator
+            summary_images = val_model.predict_on_batch(x=x)
             with summary_writer.as_default():
                 tf.summary.image("image_%d"%i, summary_images.astype("uint8"), step=epoch*steps_per_epoch, max_outputs=20)
         summary_writer.flush()
     
     summary_writer.close()
-    train_model.save_weights(os.path.join(ckpt_dir, model_struc + "_ctpn_finished.h5"))    # 保存模型
+    train_model.save_weights(os.path.join(ckpt_dir, segment_task + "_segment_" + model_struc + "_finished.h5"))    # 保存模型
     
     print("Done !")

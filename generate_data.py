@@ -18,14 +18,14 @@ if __name__ == '__main__':
     # generate_two_text_line_tfrecords(obj_num=20000, text_type="horizontal")
     # generate_two_text_line_tfrecords(obj_num=25000, text_type="vertical")
 
-    # generate_mix_text_line_imgs(obj_num=100, text_type="horizontal")
-    # generate_mix_text_line_imgs(obj_num=100, text_type="vertical")
+    generate_mix_text_line_imgs(obj_num=100, text_type="horizontal")
+    generate_mix_text_line_imgs(obj_num=100, text_type="vertical")
     # generate_mix_text_line_tfrecords(obj_num=20000, text_type="horizontal")
     # generate_mix_text_line_tfrecords(obj_num=25000, text_type="vertical")
     
     # generate_book_page_imgs(obj_num=200, text_type="horizontal")
     # generate_book_page_imgs(obj_num=200, text_type="vertical")
     # generate_book_page_tfrecords(obj_num=6500, text_type="horizontal")
-    generate_book_page_tfrecords(obj_num=8000, text_type="vertical")
+    # generate_book_page_tfrecords(obj_num=8000, text_type="vertical")
     
     print("Done !")

@@ -234,7 +234,7 @@ def get_image_and_split_pos(annotation_line):
     np_img = np.array(PIL_img, dtype=np.uint8)
     split_pos = json.loads(line[1])["split_pos_list"]
     split_pos = np.array(split_pos, dtype=np.float32)
-    split_pos.sort()
+    split_pos.sort()    # 排序
     split_pos = np.tile(split_pos[:, np.newaxis], reps=(1, 2))
     
     return np_img, split_pos

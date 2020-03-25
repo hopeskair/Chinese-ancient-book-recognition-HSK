@@ -25,7 +25,7 @@ def get_callbacks(segment_task, model_struc="densenet_gru"):
     
     check_or_makedirs(dir_name=ckpt_dir)
     checkpoint = ModelCheckpoint(
-        filepath=os.path.join(ckpt_dir, model_struc + "_ctpn_{epoch:04d}.h5"),
+        filepath=os.path.join(ckpt_dir, segment_task + "_segment_" + model_struc + "_{epoch:04d}.h5"),
         monitor='val_loss',
         verbose=1,
         save_best_only=True,
