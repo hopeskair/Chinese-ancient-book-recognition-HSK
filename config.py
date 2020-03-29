@@ -77,9 +77,12 @@ BOOK_PAGE_MAX_GT_BOXES = 1500
 BATCH_SIZE_TEXT_LINE = 8
 
 # 训练超参数
-INIT_LEARNING_RATE = 0.01
+INIT_LEARNING_RATE = 0.0005
 SGD_LEARNING_MOMENTUM = 0.9
 SGD_GRADIENT_CLIP_NORM = 5.0
+
+# 标签平滑
+LABEL_SMOOTHING = 0.1
 
 # 权重衰减
 L2_WEIGHT_DECAY = 0.0005,
@@ -235,7 +238,7 @@ SEGMENT_BATCH_SIZE = {
     "book_page": 4,
     "mix_line": 12,
     "double_line": 16,
-    "text_line": 32
+    "text_line": 48
 }
 
 SEGMENT_MAX_INCLINATION = {
@@ -281,12 +284,13 @@ SEGMENT_NMS_MAX_OUTPUTS = {
 }
 
 SEGMENT_LOSS_WEIGHTS = {
-    "segment_class_loss": 5.,
+    "segment_class_loss": 1.,
     "segment_regress_loss": 1.
 }
 
 SEGMENT_LINE_WEIGHTS = {
-    "split_line": 200.,
-    "other_space": 1.
+    "split_line": 2.,
+    "other_space": 1.,
+    "pad_space": 1.
 }
 # ************************** Segment model *******************************

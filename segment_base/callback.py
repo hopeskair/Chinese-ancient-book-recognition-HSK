@@ -31,11 +31,11 @@ def get_callbacks(segment_task, model_struc="densenet_gru"):
         save_best_only=True,
         save_weights_only=True)
     
-    lr_reducer = ReduceLROnPlateau(monitor='loss',
-                                   factor=0.1,
+    lr_reducer = ReduceLROnPlateau(monitor='val_loss',
+                                   factor=0.2,
                                    cooldown=0,
-                                   patience=10,
-                                   min_lr=1e-4)
+                                   patience=2,  # num of epochs
+                                   min_lr=0)
     
     check_or_makedirs(logs_dir)
     logs = TensorBoard(log_dir=logs_dir)

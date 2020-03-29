@@ -146,7 +146,7 @@ def DenseNet60_segment_book_page(inputs, feat_stride=16, scope="densenet"): # 60
 
 
 def DenseNet36_segment_text_line(inputs, feat_stride=16, scope="densenet"): # 36 or 39
-    blocks = [3, 5, 4, 4] if feat_stride == 16 else [3, 4, 4, 4, 2]
+    blocks = [2, 3, 3, 3] if feat_stride == 16 else [2, 3, 3, 3, 2]
     with backend.name_scope(scope):
         outputs = DenseNet(inputs, blocks=blocks)  # 1/16 or 1/32
         # outputs = DenseNet(inputs, blocks=[1, 1, 1, 1])  # for test

@@ -1,6 +1,8 @@
 # -*- encoding: utf-8 -*-
 # Author: hushukai
 
+import functools
+import threading
 import tensorflow as tf
 import numpy as np
 
@@ -72,3 +74,31 @@ def get_segment_task_thresh(segment_task):
     distance_thresh = SEGMENT_DISTANCE_THRESH[segment_task]
     nms_max_outputs = SEGMENT_NMS_MAX_OUTPUTS[segment_task]
     return cls_score_thresh, distance_thresh, nms_max_outputs
+
+
+class ThreadSafeGenerator:
+    """
+    Takes an iterator/generator and makes it thread-safe by
+    serializing call to the `next` method of given iterator/generator.
+    """
+    
+    def __init__(self, it):
+        self.it = it
+        self.lock = threading.Lock()
+    
+    def __iter__(self):
+        return self
+    
+    def __next__(self):  # python3
+        with self.lock:
+            return self.it.__next__()
+
+
+def threadsafe_generator(f):
+    """A decorator that takes a generator function and makes it thread-safe.
+    """
+    @functools.wraps(f)
+    def g(*args, **kwargs):
+        return ThreadSafeGenerator(f(*args, **kwargs))
+    
+    return g

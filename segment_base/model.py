@@ -25,7 +25,7 @@ from .gen_prediction import ExtractSplitPosition
 from .visualize import images_to_summary_tf
 from .utils import get_segment_task_params, get_segment_task_thresh
 
-from config import INIT_LEARNING_RATE
+from config import INIT_LEARNING_RATE, LABEL_SMOOTHING
 from config import SGD_LEARNING_MOMENTUM, SGD_GRADIENT_CLIP_NORM
 from config import SEGMENT_LOSS_WEIGHTS, L2_WEIGHT_DECAY
 from config import SEGMENT_LINE_WEIGHTS
@@ -109,19 +109,21 @@ def work_net(stage="train", segment_task="book_page", text_type="horizontal", mo
     feat_width = layers.Lambda(lambda x: K.shape(x)[2]//feat_stride)(batch_images)
     real_features_width = layers.Lambda(lambda x: x/feat_stride)(real_images_width)
     targets = SegmentTarget(feat_stride=feat_stride,
+                            label_smoothing=LABEL_SMOOTHING,
                             pos_weight=SEGMENT_LINE_WEIGHTS["split_line"],
                             neg_weight=SEGMENT_LINE_WEIGHTS["other_space"],
-                            pad_weight=0.2,
+                            pad_weight=SEGMENT_LINE_WEIGHTS["pad_space"],
+                            cls_score_thresh=cls_score_thresh,
                             name='segment_target'
-                            )([split_lines_pos, feat_width, real_features_width])
+                            )([split_lines_pos, feat_width, real_features_width, pred_cls_logit])
 
-    interval_cls_ids, inside_weights, split_line_delta = targets
+    interval_cls_goals, split_line_delta, interval_mask, inside_weights = targets[:4]
     
     # 损失函数
     class_loss = layers.Lambda(lambda x: interval_cls_loss(*x),
-                               name='segment_class_loss')([interval_cls_ids, pred_cls_logit, inside_weights])
+                               name='segment_class_loss')([interval_cls_goals, pred_cls_logit, inside_weights])
     regress_loss = layers.Lambda(lambda x: split_line_regress_loss(*x),
-                                 name='segment_regress_loss')([split_line_delta, pred_delta, interval_cls_ids])
+                                 name='segment_regress_loss')([split_line_delta, pred_delta, interval_mask])
     
     # ******************** Predict model *********************
     img_width = layers.Lambda(lambda x: K.shape(x)[2])(batch_images)
@@ -133,7 +135,7 @@ def work_net(stage="train", segment_task="book_page", text_type="horizontal", mo
                                                    )([pred_cls_logit, pred_delta, img_width])
     
     # *********************** Summary *************************
-    accuracy = layers.Lambda(compute_acc, name="accuracy")([pred_cls_logit, interval_cls_ids])
+    total_acc, pos_acc, neg_acc = layers.Lambda(compute_acc, name="accuracy")([pred_cls_logit, interval_mask])
     summary_img = layers.Lambda(images_to_summary_tf,
                                 arguments={"segment_task": segment_task,
                                            "text_type": text_type},
@@ -141,7 +143,7 @@ def work_net(stage="train", segment_task="book_page", text_type="horizontal", mo
     
     # ********************* Define model **********************
     if stage == 'train':
-        train_model = models.Model(inputs=crnn_model.inputs, outputs=[class_loss, regress_loss, accuracy])
+        train_model = models.Model(inputs=crnn_model.inputs, outputs=[class_loss, regress_loss, total_acc])
         summary_model = models.Model(inputs=crnn_model.inputs, outputs=[summary_img])  # 孪生网络
         return train_model, summary_model
     else:
@@ -151,20 +153,26 @@ def work_net(stage="train", segment_task="book_page", text_type="horizontal", mo
 def compute_acc(inputs):
     pred_cls_logit, real_cls_ids = inputs
     pred_cls_ids = tf.cast(pred_cls_logit > 0, tf.float32)
-    pred_result = tf.cast(pred_cls_ids == real_cls_ids, tf.float32)
-    return  tf.reduce_mean(pred_result)
+    
+    total_pred_result = tf.cast(pred_cls_ids == real_cls_ids, tf.float32)
+    pos_pred_result = tf.where(real_cls_ids == 1., total_pred_result, 0)
+    neg_pred_result = tf.where(real_cls_ids == 0., total_pred_result, 0)
+    
+    total_accuracy = tf.reduce_mean(total_pred_result)
+    pos_accuracy = tf.reduce_sum(pos_pred_result) / tf.reduce_sum(real_cls_ids)
+    neg_accuracy = tf.reduce_sum(neg_pred_result) / tf.reduce_sum(1 - real_cls_ids)
+    
+    return total_accuracy, pos_accuracy, neg_accuracy
 
 
 def compile(keras_model, loss_names=[]):
     """编译模型，添加损失函数，L2正则化"""
     
     # 优化器
-    optimizer = optimizers.SGD(lr=INIT_LEARNING_RATE,
-                               momentum=SGD_LEARNING_MOMENTUM,
-                               clipnorm=SGD_GRADIENT_CLIP_NORM)
+    # optimizer = optimizers.SGD(INIT_LEARNING_RATE, momentum=SGD_LEARNING_MOMENTUM, clipnorm=SGD_GRADIENT_CLIP_NORM)
     # optimizer = optimizers.RMSprop(learning_rate=INIT_LEARNING_RATE, rho=0.9)
-    # optimizer = optimizers.Adagrad(learning_rate=INIT_LEARNING_RATE)
-    # optimizer = optimizers.Adadelta(learning_rate=INIT_LEARNING_RATE, rho=0.95)
+    optimizer = optimizers.Adagrad(learning_rate=INIT_LEARNING_RATE)
+    # optimizer = optimizers.Adadelta(learning_rate=1., rho=0.95)
     # optimizer = optimizers.Adam(learning_rate=INIT_LEARNING_RATE, beta_1=0.9, beta_2=0.999, amsgrad=False)
     
     # 添加损失函数，首先清除损失，防止重复计算
@@ -191,15 +199,20 @@ def compile(keras_model, loss_names=[]):
     add_metrics(keras_model, metric_name_list=loss_names)
 
 
-def add_metrics(keras_model, metric_name_list):
+def add_metrics(keras_model, metric_name_list, metric_val_list=None):
     """添加度量
     Parameter:
         metric_name_list: 度量名称列表
     """
-    for name in metric_name_list:
-        if name in keras_model.metrics_names: continue
-        _layer = keras_model.get_layer(name)
-        if _layer is None: continue
-        metric_val = _layer.output * SEGMENT_LOSS_WEIGHTS.get(name, 1.)
-        keras_model.metrics_names.append(name)
-        keras_model.add_metric(metric_val, name=name, aggregation='mean')
+    if metric_val_list is None:
+        names_and_layers = [(name, keras_model.get_layer(name)) for name in metric_name_list]
+        metric_list = [(name, layer.output) for name, layer in names_and_layers if layer is not None]
+    else:
+        assert len(metric_name_list) == len(metric_val_list)
+        metric_list = zip(metric_name_list, metric_val_list)
+    
+    for metric_name, metric_val in metric_list:
+        if metric_name in keras_model.metrics_names: continue
+        metric_val = metric_val * SEGMENT_LOSS_WEIGHTS.get(metric_name, 1.)
+        keras_model.metrics_names.append(metric_name)
+        keras_model.add_metric(metric_val, name=metric_name, aggregation='mean')

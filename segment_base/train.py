@@ -21,8 +21,15 @@ def main(data_file, src_type, text_type, segment_task, epochs, init_epochs=0, mo
     compile(train_model, loss_names=['segment_class_loss', 'segment_regress_loss'])
     
     # 增加度量汇总
-    add_metrics(train_model, ['accuracy'])
+    total_acc, pos_acc, neg_acc = train_model.get_layer('accuracy').output
+    num_pos, num_neg = train_model.get_layer('segment_target').output[4:]
+    add_metrics(train_model,
+                metric_name_list=['total_acc', 'pos_acc', 'neg_acc', 'num_pos', 'num_neg'],
+                metric_val_list=[total_acc, pos_acc, neg_acc, num_pos, num_neg])
     train_model.summary()
+    
+    # for layer in train_model.layers:
+    #     print(layer.name, " trainable: ", layer.trainable)
     
     # load model
     load_path = os.path.join(ckpt_dir, segment_task + "_segment_" + model_struc + "_{:04d}.h5".format(init_epochs))
@@ -35,10 +42,11 @@ def main(data_file, src_type, text_type, segment_task, epochs, init_epochs=0, mo
                                                               segment_task=segment_task,
                                                               src_type=src_type,
                                                               text_type=text_type)
-
+    
     summary_writer = tf.summary.create_file_writer(logs_dir)
+    callbacks = get_callbacks(segment_task, model_struc)
     steps_per_epoch = 200
-    for epoch in range(epochs):
+    for epoch in range(init_epochs, init_epochs + epochs):
         # 开始训练
         train_model.fit_generator(generator=training_generator,
                                   steps_per_epoch=steps_per_epoch,
@@ -47,14 +55,14 @@ def main(data_file, src_type, text_type, segment_task, epochs, init_epochs=0, mo
                                   verbose=1,
                                   validation_data=validation_generator,
                                   validation_steps=10,
-                                  callbacks=get_callbacks(segment_task, model_struc),
+                                  callbacks=callbacks,
                                   max_queue_size=100)
         
         for i in range(5):  # 汇总图片
             x = next(validation_generator) if src_type == "images" else validation_generator
-            summary_images = val_model.predict_on_batch(x=x)
+            summary_images = val_model.predict_on_batch(x=x).numpy()
             with summary_writer.as_default():
-                tf.summary.image("image_%d"%i, summary_images.astype("uint8"), step=epoch*steps_per_epoch, max_outputs=20)
+                tf.summary.image("image_%d"%i, summary_images.astype("uint8"), step=epoch * steps_per_epoch, max_outputs=20)
         summary_writer.flush()
     
     summary_writer.close()

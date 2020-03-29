@@ -434,11 +434,11 @@ def generate_one_row_chars(x, y1, y2, length, np_background, char_spacing):
     
     # 获取字符之间的划分位置
     char_spacing_w = round(row_height * char_spacing[1])
-    split_pos = [max(head_x1 - char_spacing_w, 0),]
+    split_pos = [head_x1,]
     for i in range(len(char_and_box_list)-1):
         x_cent = (char_and_box_list[i][1][2] + char_and_box_list[i+1][1][0]) // 2
         split_pos.append(x_cent)
-    split_pos.append(min(tail_x2 + char_spacing_w, row_end))
+    split_pos.append(tail_x2)
 
     return x, text_bbox, char_and_box_list, split_pos
 
@@ -453,7 +453,7 @@ def generate_two_rows_chars(x, y1, y2, length, np_background, char_spacing):
     # 获取文本行之间的划分位置
     center_val = (text1_bbox[3] + text2_bbox[1]) // 2
     char_spacing_h = round(row_height * char_spacing[0])
-    split_pos = [max(text1_bbox[1] - char_spacing_h, y1), center_val, min(text2_bbox[3] + char_spacing_h, y2)]
+    split_pos = [text1_bbox[1], center_val, text2_bbox[3]]
     
     return max(x_1, x_2), text1_bbox, text2_bbox, split_pos
 
@@ -480,11 +480,11 @@ def generate_one_col_chars(x1, x2, y, length, np_background, char_spacing):
 
     # 获取字符之间的划分位置
     char_spacing_h = round(col_width * char_spacing[0])
-    split_pos = [max(head_y1 - char_spacing_h, 0), ]
+    split_pos = [head_y1, ]
     for i in range(len(char_and_box_list) - 1):
         x_cent = (char_and_box_list[i][1][3] + char_and_box_list[i + 1][1][1]) // 2
         split_pos.append(x_cent)
-    split_pos.append(min(tail_y2 + char_spacing_h, col_end))
+    split_pos.append(tail_y2)
 
     return y, text_bbox, char_and_box_list, split_pos
 
@@ -499,7 +499,7 @@ def generate_two_cols_chars(x1, x2, y, length, np_background, char_spacing):
     # 获取文本行之间的划分位置
     center_val = (text1_bbox[2] + text2_bbox[0]) // 2
     char_spacing_w = round(col_width * char_spacing[1])
-    split_pos = [max(text1_bbox[0]-char_spacing_w, x1), center_val, min(text2_bbox[2]+char_spacing_w, x2)]
+    split_pos = [text1_bbox[0], center_val, text2_bbox[2]]
 
     return max(y_1, y_2), text1_bbox, text2_bbox, split_pos
 
@@ -531,11 +531,11 @@ def generate_mix_rows_chars(x, y1, y2, row_length, np_background, char_spacing):
     # 获取单双行的划分位置
     char_spacing_w = round(row_height * char_spacing[1])
     head_x1, tail_x2 = head_tail_list[0][0], head_tail_list[-1][1]
-    split_pos = [max(head_x1 - char_spacing_w, x_start),]
+    split_pos = [head_x1,]
     for i in range(len(head_tail_list)-1):
         x_cent = (head_tail_list[i][1] + head_tail_list[i+1][0]) // 2
         split_pos.append(x_cent)
-    split_pos.append(min(tail_x2+char_spacing_w, x_start+row_length-1))
+    split_pos.append(tail_x2)
     
     return x, text_bbox_list, split_pos
 
@@ -567,11 +567,11 @@ def generate_mix_cols_chars(x1, x2, y, col_length, np_background, char_spacing):
     # 获取单双行的划分位置
     char_spacing_h = round(col_width * char_spacing[0])
     head_y1, tail_y2 = head_tail_list[0][0], head_tail_list[-1][1]
-    split_pos = [max(head_y1 - char_spacing_h, y_start), ]
+    split_pos = [head_y1,]
     for i in range(len(head_tail_list) - 1):
         y_cent = (head_tail_list[i][1] + head_tail_list[i + 1][0]) // 2
         split_pos.append(y_cent)
-    split_pos.append(min(tail_y2 + char_spacing_h, y_start + col_length - 1))
+    split_pos.append(tail_y2)
     
     return y, text_bbox_list, split_pos
 

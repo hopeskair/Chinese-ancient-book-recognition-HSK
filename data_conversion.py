@@ -14,7 +14,8 @@ from config import CTPN_BOOK_PAGE_TAGS_FILE
 # from data_generator.data_conversion_crnn import convert_annotation as convert_annotation_crnn
 # from data_generator.data_conversion_ctpn import convert_annotation as convert_annotation_ctpn
 from segment_book_page.data_conversion import main as segment_book_page_main
-from segment_mix_line.data_conversion import main as segment_mix_line_main
+# from segment_mix_line.data_conversion import main as segment_mix_line_main
+from segment_text_line.data_conversion import main as segment_text_line_main
 
 
 if __name__ == '__main__':
@@ -27,6 +28,7 @@ if __name__ == '__main__':
     # convert_annotation_ctpn(tfrecords_dir=BOOK_PAGE_TFRECORDS_V)
     
     # segment_book_page_main()
-    segment_mix_line_main()
+    # segment_mix_line_main()
+    segment_text_line_main()
     
     print("Done !")

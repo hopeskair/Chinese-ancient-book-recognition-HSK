@@ -5,20 +5,20 @@ import tensorflow as tf
 from tensorflow.keras import backend as K
 
 
-def interval_cls_loss(interval_cls_ids, pred_cls_logit, inside_weights):
+def interval_cls_loss(interval_cls_goals, pred_cls_logit, inside_weights):
     
-    loss = K.binary_crossentropy(interval_cls_ids, pred_cls_logit, from_logits=True)
+    loss = K.binary_crossentropy(interval_cls_goals, pred_cls_logit, from_logits=True)
     loss = loss * inside_weights
     
-    return tf.reduce_mean(loss)
+    return tf.reduce_sum(loss) / tf.reduce_sum(inside_weights)
 
 
-def split_line_regress_loss(split_line_delta, pred_delta, cls_ids_mask):
+def split_line_regress_loss(split_line_delta, pred_delta, interval_mask):
     
     loss = smooth_l1_loss(split_line_delta, pred_delta)
-    loss = tf.reduce_sum(loss, axis=-1) * cls_ids_mask
+    loss = tf.reduce_sum(loss, axis=-1) * interval_mask
     
-    return tf.reduce_sum(loss) / tf.reduce_sum(cls_ids_mask)
+    return tf.reduce_sum(loss) / tf.reduce_sum(interval_mask)
     
 
 def smooth_l1_loss(y_true, y_predict, sigma2=9.0):

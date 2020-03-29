@@ -8,20 +8,19 @@ from tensorflow.keras import backend as K
 from .utils import pad_to_fixed_size_tf, remove_pad_tf
 
 
-def nms(split_positions, scores, img_width, score_thresh=0.7, distance_thresh=16, max_outputs=50):
+def nms(split_positions, scores, score_thresh=0.7, distance_thresh=16, max_outputs=50):
     """Non-Maximum-Suppression"""
-    img_width = tf.cast(img_width, tf.float32)
-    indices = tf.where(tf.logical_and(
-        tf.logical_and(split_positions[..., 0] >= 0,
-                       split_positions[..., 0] <= img_width - 1),
-        tf.logical_and(split_positions[..., 1] >= 0,
-                       split_positions[..., 1] <= img_width - 1)))[:, 0]
-    scores = tf.gather(scores, indices)
-    split_positions = tf.gather(split_positions, indices)
     
     indices = tf.where(scores >= score_thresh)[:, 0]
     scores = tf.gather(scores, indices)
     split_positions = tf.gather(split_positions, indices)
+    
+    # 获取自适应的distance_thresh
+    split_num = tf.cast(tf.shape(split_positions)[0], tf.float32)
+    split_cent = tf.reduce_mean(split_positions, axis=1)
+    split_minimum = tf.reduce_min(split_cent)
+    split_maximum = tf.reduce_max(split_cent)
+    distance_thresh = 0.55 * (split_maximum - split_minimum) / (split_num - 1.)
     
     ordered_indices = tf.argsort(scores)[::-1]
     ordered_scores = tf.gather(scores, ordered_indices)
@@ -71,20 +70,23 @@ class ExtractSplitPosition(layers.Layer):
         pred_cls_logit, pred_delta, img_width = inputs
         feat_width = img_width // self.feat_stride
 
-        interval_center = (tf.range(0, feat_width, dtype=tf.float32) + 0.5) * self.feat_stride
+        interval_center = (tf.range(0., feat_width) + 0.5) * self.feat_stride
         interval_center = tf.tile(interval_center[:, tf.newaxis], multiples=[1, 2])
         interval_center = interval_center[tf.newaxis, ...]  # shape (1, feat_width, 2)
         
         pred_split_positions = pred_delta * self.feat_stride + interval_center
-        scores = K.sigmoid(pred_cls_logit)
+        pred_scores = K.sigmoid(pred_cls_logit)
+
+        img_width = tf.cast(img_width, tf.float32)
+        pred_split_positions = tf.where(pred_split_positions < 0., 0., pred_split_positions)
+        pred_split_positions = tf.where(pred_split_positions > img_width - 1., img_width - 1., pred_split_positions)
 
         # 非极大抑制
-        options = {"img_width": img_width,
-                   "score_thresh": self.cls_score_thresh,
+        options = {"score_thresh": self.cls_score_thresh,
                    "distance_thresh": self.distance_thresh,
                    "max_outputs": self.nms_max_outputs}
         outputs = tf.map_fn(fn=lambda x: nms(*x, **options),
-                            elems=[pred_split_positions, scores],
+                            elems=[pred_split_positions, pred_scores],
                             dtype=[tf.float32, tf.float32])
         
         return outputs

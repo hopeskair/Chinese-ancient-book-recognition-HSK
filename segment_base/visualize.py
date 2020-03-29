@@ -21,7 +21,7 @@ def draw_text_boxes(np_img, text_boxes):
     
     draw = ImageDraw.Draw(PIL_img)
     # font_path = os.path.join(CTPN_ROOT_DIR, "font", "FiraMono-Medium.otf")
-    # font_object = ImageFont.truetype(font=font_path, size=int(3e-2 * h))  # 字体
+    # font_object = ImageFont.truetype(font=font_path, size=16)  # 字体, or size=int(3e-2 * h)
     
     for i, text_box in enumerate(text_boxes):
         score = text_box[8]  # 得分
@@ -55,7 +55,7 @@ def draw_split_lines(np_img, split_positions, scores=None):
     
     draw = ImageDraw.Draw(PIL_img)
     font_path = os.path.join(CTPN_ROOT_DIR, "font", "FiraMono-Medium.otf")
-    font_object = ImageFont.truetype(font=font_path, size=int(3e-2 * h))  # 字体
+    font_object = ImageFont.truetype(font=font_path, size=16)  # 字体, or size=int(3e-2 * h)
     
     for i, (x1, x2) in enumerate(split_positions):
         y1, y2 = 0, h-1

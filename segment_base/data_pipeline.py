@@ -8,6 +8,7 @@ from skimage import color, transform
 import numpy as np
 import tensorflow as tf
 
+from segment_base.utils import threadsafe_generator
 from segment_base.utils import get_segment_task_params
 
 from config import SEGMENT_MAX_INCLINATION
@@ -189,7 +190,7 @@ def adjust_img_to_fixed_height(np_img, split_positions=None, fixed_h=560, segmen
     # scale image to fixed size
     raw_h, raw_w = np_img.shape[:2]
     scale_ratio = fixed_h / raw_h  # fixed_h是16的倍数
-    np_img = transform.resize(np_img, output_shape=(int(raw_h * scale_ratio), int(raw_w * scale_ratio)))  # float32
+    np_img = transform.resize(np_img, output_shape=(fixed_h, int(raw_w * scale_ratio)))  # float32
     np_img = np_img.astype(np.uint8)
     
     if split_positions is not None:
@@ -213,7 +214,7 @@ def adjust_img_to_fixed_height_tf(img_tensor, split_positions, fixed_h=560, segm
     fixed_h = tf.constant(fixed_h, dtype=tf.float32)  # 16的倍数
     raw_shape = tf.cast(tf.shape(img_tensor)[:2], tf.float32)
     scale_ratio = fixed_h / raw_shape[0]
-    new_size = tf.cast(raw_shape * scale_ratio, dtype=tf.int32)
+    new_size = tf.cast([fixed_h, raw_shape[1] * scale_ratio], dtype=tf.int32)
     img_tensor = tf.image.resize(img_tensor, size=new_size)  # float32
     img_tensor = tf.cast(img_tensor, dtype=tf.uint8)
     split_positions = split_positions * scale_ratio
@@ -272,6 +273,7 @@ def pack_a_batch(imgs_list, split_pos_list, feat_stride=16, background="white"):
     return batch_imgs, real_images_width, split_positions
 
 
+@threadsafe_generator
 def data_generator_with_images(annotation_lines,
                                batch_size,
                                fixed_h,
