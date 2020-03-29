@@ -151,11 +151,11 @@ def generate_two_text_line_imgs(obj_num=100, text_type="horizontal", text_shape=
     with open(text_line_tags_file, "w", encoding="utf-8") as fw:
         for i in range(obj_num):
             if text_shape is None and text_type == "h":
-                _shape = (random.randint(56, 108), random.randint(96, 640)) # 双行文本数据无需太长
+                _shape = (random.randint(54, 108), random.randint(108, 960)) # 双行文本数据无需太长
             if text_shape is None and text_type == "v":
-                _shape = (random.randint(96, 640), random.randint(56, 108)) # 双行文本数据无需太长
+                _shape = (random.randint(108, 960), random.randint(54, 108)) # 双行文本数据无需太长
 
-            PIL_text, _, _, split_pos_list = create_two_text_line(_shape, text_type=text_type)
+            PIL_text, split_pos_list = create_two_text_line(_shape, text_type=text_type)
             image_tags = {"split_pos_list": split_pos_list}
             
             img_name = "text_line_%d.jpg" % i
@@ -190,11 +190,11 @@ def generate_two_text_line_tfrecords(obj_num=100, text_type="horizontal", text_s
         writer = random.choice(writers_list)
 
         if text_shape is None and text_type == "h":
-            _shape = (random.randint(54, 108), random.randint(720, 1280))
+            _shape = (random.randint(54, 108), random.randint(108, 960))  # 双行文本数据无需太长
         if text_shape is None and text_type == "v":
-            _shape = (random.randint(720, 1280), random.randint(54, 108))
+            _shape = (random.randint(108, 960), random.randint(54, 108))  # 双行文本数据无需太长
 
-        PIL_text, _, _, split_pos_list = create_two_text_line(_shape, text_type=text_type)
+        PIL_text, split_pos_list = create_two_text_line(_shape, text_type=text_type)
         
         bytes_image = PIL_text.tobytes()  # 将图片转化为原生bytes
         split_positions = np.array(split_pos_list).tobytes()
@@ -338,6 +338,8 @@ def create_one_text_line(shape=(36, 720), text_type="horizontal"):
 
 
 def create_two_text_line(shape=(64, 1280), text_type="horizontal"):
+    """训练双行文本的切分，既需要生成双行数据，也需要生成单行数据（不切分的情况）"""
+    
     text_type = check_text_type(text_type)
     check_text_line_shape(shape, text_type)
     text_h, text_w = shape
@@ -350,20 +352,30 @@ def create_two_text_line(shape=(64, 1280), text_type="horizontal"):
         # 随机决定字符间距占行距的比例
         char_spacing = (random.uniform(0.0, 0.05), random.uniform(0.0, 0.2))  # (高方向, 宽方向)
         
-        # 生成两行汉字
         y1, y2 = 0, text_h - 1
         x = 0
-        _, text1_bbox, text2_bbox, split_pos = generate_two_rows_chars(x, y1, y2, text_w, np_text, char_spacing)
+        if random.random() < 0.7:
+            # 生成两行汉字
+            _, text1_bbox, text2_bbox, split_pos = generate_two_rows_chars(x, y1, y2, text_w, np_text, char_spacing)
+        else:
+            # 生成单行汉字
+            _, text_bbox, _, _ = generate_one_row_chars(x, y1, y2, text_w, np_text, char_spacing)
+            split_pos = [text_bbox[1], text_bbox[3]]
     
     # 纵向排列
     else:
         # 随机决定字符间距占列距的比例
         char_spacing = (random.uniform(0.0, 0.2), random.uniform(0.0, 0.05))  # (高方向, 宽方向)
         
-        # 生成两列汉字
         x1, x2 = 0, text_w - 1
         y = 0
-        _, text1_bbox, text2_bbox, split_pos = generate_two_cols_chars(x1, x2, y, text_h, np_text, char_spacing)
+        if random.random() < 0.7:
+            # 生成两列汉字
+            _, text1_bbox, text2_bbox, split_pos = generate_two_cols_chars(x1, x2, y, text_h, np_text, char_spacing)
+        else:
+            # 生成单列汉字
+            _, text_bbox, _, _ = generate_one_col_chars(x1, x2, y, text_h, np_text, char_spacing)
+            split_pos = [text_bbox[0], text_bbox[2]]
     
     np_text = reverse_image_color(np_img=np_text)
     PIL_text = Image.fromarray(np_text)
@@ -371,7 +383,7 @@ def create_two_text_line(shape=(64, 1280), text_type="horizontal"):
     # print(chinese_char_and_box_list)
     # print(len(chinese_char_and_box_list))
     # PIL_text.show()
-    return PIL_text, text1_bbox, text2_bbox, split_pos
+    return PIL_text, split_pos
 
 
 def create_mix_text_line(shape=(64, 1280), text_type="horizontal"):

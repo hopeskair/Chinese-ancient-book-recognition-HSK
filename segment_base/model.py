@@ -14,9 +14,9 @@ from networks.resnext import ReNext40_segment_text_line as ReNext_segment_text_l
 from networks.resnext import ReNext40_segment_mix_line as ReNext_segment_mix_line
 from networks.resnext import ReNext40_segment_double_line as ReNext_segment_double_line
 from networks.densenet import DenseNet60_segment_book_page as DenseNet_segment_book_page
-from networks.densenet import DenseNet36_segment_text_line as DenseNet_segment_text_line
+from networks.densenet import DenseNet26_segment_text_line as DenseNet_segment_text_line
 from networks.densenet import DenseNet36_segment_mix_line as DenseNet_segment_mix_line
-from networks.densenet import DenseNet36_segment_double_line as DenseNet_segment_double_line
+from networks.densenet import DenseNet26_segment_double_line as DenseNet_segment_double_line
 
 from .data_pipeline import image_preprocess_tf
 from .gen_target import SegmentTarget

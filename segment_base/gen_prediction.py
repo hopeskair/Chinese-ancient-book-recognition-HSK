@@ -14,13 +14,15 @@ def nms(split_positions, scores, score_thresh=0.7, distance_thresh=16, max_outpu
     indices = tf.where(scores >= score_thresh)[:, 0]
     scores = tf.gather(scores, indices)
     split_positions = tf.gather(split_positions, indices)
-    
+
     # 获取自适应的distance_thresh
-    split_num = tf.cast(tf.shape(split_positions)[0], tf.float32)
-    split_cent = tf.reduce_mean(split_positions, axis=1)
-    split_minimum = tf.reduce_min(split_cent)
-    split_maximum = tf.reduce_max(split_cent)
-    distance_thresh = 0.55 * (split_maximum - split_minimum) / (split_num - 1.)
+    if distance_thresh <= 1:
+        distance_thresh_ratio = distance_thresh
+        split_num = tf.cast(tf.shape(split_positions)[0], tf.float32)
+        split_cent = tf.reduce_mean(split_positions, axis=1)
+        split_minimum = tf.reduce_min(split_cent)
+        split_maximum = tf.reduce_max(split_cent)
+        distance_thresh = distance_thresh_ratio * (split_maximum - split_minimum) / (split_num - 1.)
     
     ordered_indices = tf.argsort(scores)[::-1]
     ordered_scores = tf.gather(scores, ordered_indices)

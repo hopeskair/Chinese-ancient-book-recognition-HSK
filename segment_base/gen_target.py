@@ -53,9 +53,12 @@ class SegmentTarget(layers.Layer):
         
         split_line_delta = (interval_split_line - interval_center) / self.feat_stride
         
-        # 抽样，使正负样本均衡
+        # 抽样，使正负样本均衡（主要针对text_line切分任务）
         num_positive = tf.shape(target_indices)[0]
         num_negative = num_positive * tf.cast(self.pos_weight / self.neg_weight, tf.int32)
+        
+        # 对于double_line, mix_line切分任务来说, 不需要抽样（或者说全部作为样本）
+        num_negative = tf.where(num_positive < 5 * batch_size, batch_size * feat_width - 3 * num_positive, num_negative)
         
         nearby_maximum = tf.nn.max_pool1d(interval_mask[..., tf.newaxis], ksize=3, strides=1, padding="SAME")   # zero padding
         nearby_maximum = tf.reshape(nearby_maximum, shape=tf.shape(nearby_maximum)[:2])

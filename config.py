@@ -270,10 +270,10 @@ SEGMENT_CLS_SCORE_THRESH = {
 }
 
 SEGMENT_DISTANCE_THRESH = {
-    "book_page": 16,
-    "mix_line": 16,
-    "double_line": 16,
-    "text_line": 16
+    "book_page": 28,
+    "mix_line": 24,
+    "double_line": 20,
+    "text_line": 0.6    # distance threshold ratio
 }
 
 SEGMENT_NMS_MAX_OUTPUTS = {
