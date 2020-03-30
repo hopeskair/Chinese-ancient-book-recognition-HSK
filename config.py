@@ -237,8 +237,15 @@ SEGMENT_ID_TO_TASK = {
 SEGMENT_BATCH_SIZE = {
     "book_page": 4,
     "mix_line": 12,
-    "double_line": 16,
+    "double_line": 1,   # Batch size can only be 1 since the input is arbitrary height.
     "text_line": 48
+}
+
+SEGMENT_FIXED_SHAPE = {
+    "book_page": (560, None),
+    "mix_line": (80, None),
+    "double_line": (None, 80),  # Arbitrary height
+    "text_line": (48, None)
 }
 
 SEGMENT_MAX_INCLINATION = {
@@ -246,13 +253,6 @@ SEGMENT_MAX_INCLINATION = {
     "mix_line": 12,
     "double_line": 12,
     "text_line": 8
-}
-
-SEGMENT_FIXED_HEIGHT = {
-    "book_page": 560,
-    "mix_line": 80,
-    "double_line": 256,
-    "text_line": 48
 }
 
 SEGMENT_FEATURE_STRIDE = {
@@ -289,7 +289,7 @@ SEGMENT_LOSS_WEIGHTS = {
 }
 
 SEGMENT_LINE_WEIGHTS = {
-    "split_line": 2.,
+    "split_line": 10.,
     "other_space": 1.,
     "pad_space": 1.
 }

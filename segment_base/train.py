@@ -45,7 +45,7 @@ def main(data_file, src_type, text_type, segment_task, epochs, init_epochs=0, mo
     
     summary_writer = tf.summary.create_file_writer(logs_dir)
     callbacks = get_callbacks(segment_task, model_struc)
-    steps_per_epoch = 200
+    steps_per_epoch = 2000
     for epoch in range(init_epochs, init_epochs + epochs):
         # 开始训练
         train_model.fit_generator(generator=training_generator,

@@ -113,7 +113,7 @@ def generate_one_text_line_tfrecords(obj_num=100, text_type="horizontal", text_s
         bytes_chars = "".join([chinese_char for chinese_char, gt_box in char_and_box_list]).encode("utf-8")
         labels = np.array([CHAR2ID_DICT[char] for char, gt_box in char_and_box_list], dtype=np.int32).tobytes()
         gt_boxes = np.array([gt_box for chinese_char, gt_box in char_and_box_list], dtype=np.int32).tobytes()
-        split_positions = np.array(split_pos_list).tobytes()
+        split_positions = np.array(split_pos_list, dtype=np.int32).tobytes()
 
         example = tf.train.Example(
             features=tf.train.Features(
@@ -197,7 +197,7 @@ def generate_two_text_line_tfrecords(obj_num=100, text_type="horizontal", text_s
         PIL_text, split_pos_list = create_two_text_line(_shape, text_type=text_type)
         
         bytes_image = PIL_text.tobytes()  # 将图片转化为原生bytes
-        split_positions = np.array(split_pos_list).tobytes()
+        split_positions = np.array(split_pos_list, dtype=np.int32).tobytes()
         
         example = tf.train.Example(
             features=tf.train.Features(
@@ -278,7 +278,7 @@ def generate_mix_text_line_tfrecords(obj_num=100, text_type="horizontal", text_s
         PIL_text, _, split_pos_list = create_mix_text_line(_shape, text_type=text_type)
         
         bytes_image = PIL_text.tobytes()  # 将图片转化为原生bytes
-        split_positions = np.array(split_pos_list).tobytes()
+        split_positions = np.array(split_pos_list, dtype=np.int32).tobytes()
         
         example = tf.train.Example(
             features=tf.train.Features(

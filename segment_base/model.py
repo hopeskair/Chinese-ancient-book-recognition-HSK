@@ -59,21 +59,47 @@ def Bidirectional_RNN(inputs, rnn_units=256, rnn_type="gru"):
                 merge_mode="concat")(inputs)
     
     return outputs
+
+
+def fixed_height_pooling(inputs, output_h=3, method="max"):
+    curr_h = tf.shape(inputs)[1]
+    padding_h = -curr_h % output_h
+    
+    h1 = padding_h // 2
+    h2 = padding_h - h1
+    inputs = tf.pad(inputs, [[0,0], [h1,h2], [0,0], [0,0]], mode="CONSTANT", constant_values=0)
+    
+    _stride = (curr_h + padding_h) // output_h
+    piece_tensors = [inputs[:, _stride*i:_stride*(i+1)] for i in range(output_h)]
+    
+    _reduce = tf.reduce_max if method == "max" else tf.reduce_mean
+    reduced_tensors = [_reduce(tensor, axis=1, keepdims=True) for tensor in piece_tensors]
+    
+    pooling_tensor = tf.concat(reduced_tensors, axis=1)
+    
+    return pooling_tensor
     
 
-def build_crnn(batch_size, fixed_h, feat_stride=16, segment_task="book_page", model_struc="densenet_gru"):
+def build_crnn(batch_size, fixed_h, feat_stride=16, stage="train", segment_task="book_page", model_struc="densenet_gru"):
     batch_images = layers.Input(batch_shape=[batch_size, fixed_h, None, 3], name='batch_images')
     real_images_width = layers.Input(batch_shape=[batch_size], name="real_images_width")
     split_lines_pos = layers.Input(batch_shape=[batch_size, None, 2], name='split_lines_pos')
     # 要求划分位置是有序的，从小到大; padding value -1
     
     # ******************** Build *********************
-    convert_imgs = layers.Lambda(image_preprocess_tf, name="image_preprocess")(batch_images)   # image normalization
+    # image normalization
+    convert_imgs = layers.Lambda(image_preprocess_tf, arguments={"stage": stage}, name="image_preprocess")(batch_images)
     
     cnn_type, rnn_type = model_struc.split("_")[:2]
     features = CNN(segment_task, cnn_type)(convert_imgs, feat_stride, scope=cnn_type)
-
-    x = layers.Conv2D(256, (fixed_h//feat_stride, 1), use_bias=True, name="conv_into_seq")(features)
+    
+    if segment_task in ("double_line",):    # fixed_h为None, features的高度不固定
+        feat_h = 3
+        features = layers.Lambda(fixed_height_pooling, arguments={"output_h":feat_h, "method":"max"})(features)
+    else:
+        feat_h = fixed_h // feat_stride
+    
+    x = layers.Conv2D(256, (feat_h, 1), use_bias=True, name="conv_into_seq")(features)
     x = layers.BatchNormalization(axis=3, epsilon=1.001e-5, name="bn_after_conversion")(x)
     x = layers.Activation('relu', name="relu_after_conversion")(x)
     x = layers.Lambda(lambda x: K.squeeze(x, axis=1), name="feature_squeeze")(x)
@@ -96,11 +122,12 @@ def build_crnn(batch_size, fixed_h, feat_stride=16, segment_task="book_page", mo
 
 
 def work_net(stage="train", segment_task="book_page", text_type="horizontal", model_struc="densenet_gru"):
-    batch_size, fixed_h, feat_stride = get_segment_task_params(segment_task)
+    batch_size, fixed_shape, feat_stride = get_segment_task_params(segment_task)
     cls_score_thresh, distance_thresh, nms_max_outputs = get_segment_task_thresh(segment_task)
     if stage != "train": batch_size = 1
     
-    crnn_model = build_crnn(batch_size, fixed_h, feat_stride, segment_task, model_struc)
+    fixed_h = fixed_shape[0]    # None if segment_task is double_line.
+    crnn_model = build_crnn(batch_size, fixed_h, feat_stride, stage, segment_task, model_struc)
 
     batch_images, real_images_width, split_lines_pos = crnn_model.inputs
     pred_cls_logit, pred_delta = crnn_model.outputs
@@ -114,6 +141,7 @@ def work_net(stage="train", segment_task="book_page", text_type="horizontal", mo
                             neg_weight=SEGMENT_LINE_WEIGHTS["other_space"],
                             pad_weight=SEGMENT_LINE_WEIGHTS["pad_space"],
                             cls_score_thresh=cls_score_thresh,
+                            segment_task=segment_task,
                             name='segment_target'
                             )([split_lines_pos, feat_width, real_features_width, pred_cls_logit])
 
@@ -159,7 +187,7 @@ def compute_acc(inputs):
     neg_pred_result = tf.where(real_cls_ids == 0., total_pred_result, 0)
     
     total_accuracy = tf.reduce_mean(total_pred_result)
-    pos_accuracy = tf.reduce_sum(pos_pred_result) / tf.reduce_sum(real_cls_ids)
+    pos_accuracy = tf.reduce_sum(pos_pred_result) / (tf.reduce_sum(real_cls_ids) + 1e-5)    # 防止零除而出现Nan
     neg_accuracy = tf.reduce_sum(neg_pred_result) / tf.reduce_sum(1 - real_cls_ids)
     
     return total_accuracy, pos_accuracy, neg_accuracy

@@ -15,9 +15,10 @@ from config import SEGMENT_MAX_INCLINATION
 from config import SEGMENT_TASK_ID, SEGMENT_ID_TO_TASK
 
 
-def image_preprocess_tf(images):
+def image_preprocess_tf(images, stage="train"):
     convert_imgs = tf.image.per_image_standardization(images)
-    convert_imgs = tf.cond(tf.random.uniform([]) < 0.5, lambda: convert_imgs, lambda: 1. - convert_imgs)
+    if stage == "train":
+        convert_imgs = tf.cond(tf.random.uniform([]) < 0.5, lambda: convert_imgs, lambda: 1. - convert_imgs)
     return convert_imgs
 
 
@@ -53,31 +54,34 @@ def salt_and_pepper_noise(np_img, proportion=0.05):
 def gauss_noise_tf(img_tensor):
     img_tensor = tf.cast(img_tensor, dtype=tf.float32)  # 此步是为了避免像素点小于0，大于255的情况
     
-    noise = tf.random.normal(img_tensor.shape, mean=0.0, stddev=30.0)
+    noise = tf.random.normal(tf.shape(img_tensor), mean=0.0, stddev=30.0)
     img_tensor = img_tensor + noise
-    img_tensor = tf.where(img_tensor < 0, 0, img_tensor)
-    img_tensor = tf.where(img_tensor > 255, 255, img_tensor)
+    img_tensor = tf.where(img_tensor < 0., 0., img_tensor)
+    img_tensor = tf.where(img_tensor > 255., 255., img_tensor)
     img_tensor = tf.cast(img_tensor, dtype=tf.uint8)
     
     return img_tensor
 
 
 def salt_and_pepper_noise_tf(img_tensor, proportion=0.05):
-    h, w, c = img_tensor.shape[:3]
-    num = int(h * w * proportion) // 2  # 添加椒盐噪声的个数
+    img_shape = tf.shape(img_tensor, out_type=tf.int64)
+    float_shape = tf.cast(img_shape, tf.float32)
+    h, w = img_shape[0], img_shape[1]
+    fh, fw = float_shape[0], float_shape[1]
+    num = tf.cast(fh * fw * proportion, tf.int32) // 2  # 添加椒盐噪声的个数
     
     # 椒噪声
     hs = tf.random.uniform([num], 0, h - 1, dtype=tf.int64)
     ws = tf.random.uniform([num], 0, w - 1, dtype=tf.int64)
     hs_ws = tf.stack([hs, ws], axis=1)
-    noise = tf.constant([[0] * c] * num, dtype=img_tensor.dtype)
+    noise = tf.zeros(shape=[num, 3], dtype=img_tensor.dtype)
     img_tensor = tf.tensor_scatter_nd_add(img_tensor, indices=hs_ws, updates=noise)
     
     # 盐噪声
     hs = tf.random.uniform([num], 0, h - 1, dtype=tf.int64)
     ws = tf.random.uniform([num], 0, w - 1, dtype=tf.int64)
     hs_ws = tf.stack([hs, ws], axis=1)
-    noise = tf.constant([[255] * c] * num, dtype=img_tensor.dtype)
+    noise = tf.zeros(shape=[num, 3], dtype=img_tensor.dtype) + 255
     img_tensor = tf.tensor_scatter_nd_add(img_tensor, indices=hs_ws, updates=noise)
     
     return img_tensor
@@ -90,8 +94,8 @@ def imgs_augmentation(np_img):
 
 
 def imgs_augmentation_tf(img_tensors):
-    # img_tensors = gauss_noise_tf(img_tensors)  # 高斯噪声
-    # img_tensors = salt_and_pepper_noise(img_tensors)  # 椒盐噪声
+    img_tensors = gauss_noise_tf(img_tensors)  # 高斯噪声
+    img_tensors = salt_and_pepper_noise_tf(img_tensors)  # 椒盐噪声
     
     # augment images, 这些方法对uint8, float32类型均有效
     img_tensors = tf.image.random_brightness(img_tensors, max_delta=0.5)
@@ -177,7 +181,7 @@ def tilt_text_img_py(np_img, split_positions, segment_task):
     return [np_img, split_positions]
 
 
-def adjust_img_to_fixed_height(np_img, split_positions=None, fixed_h=560, segment_task="book_page", text_type="horizontal"):
+def adjust_img_to_fixed_shape(np_img, split_positions=None, fixed_shape=(560, None), feat_stride=16, segment_task="book_page", text_type="horizontal"):
     # rotate 90 degrees rightward.
     text_type = text_type[0].lower()
     if (segment_task, text_type) in (("book_page", "h"), ("double_line", "h"), ("text_line", "v"), ("mix_line", "v")):
@@ -187,10 +191,17 @@ def adjust_img_to_fixed_height(np_img, split_positions=None, fixed_h=560, segmen
     if len(np_img.shape) == 2 or np_img.shape[-1] != 3:
         np_img = color.grey2rgb(np_img)
     
-    # scale image to fixed size
+    # scale image to fixed shape
     raw_h, raw_w = np_img.shape[:2]
-    scale_ratio = fixed_h / raw_h  # fixed_h是16的倍数
-    np_img = transform.resize(np_img, output_shape=(fixed_h, int(raw_w * scale_ratio)))  # float32
+    fixed_h, fixed_w = fixed_shape
+    if segment_task in ("book_page", "mix_line", "text_line"):
+        scale_ratio = fixed_h / raw_h       # fixed_h是16的倍数, fixed_w为None
+        fixed_w = int(raw_w * scale_ratio)  # 在打包batch时，将调整为16的倍数
+    else:
+        scale_ratio = fixed_w / raw_w       # double_line情况, fixed_h为None, fixed_w是16的倍数
+        fixed_h = int(raw_h * scale_ratio)
+        fixed_h += -fixed_h % feat_stride   # 调整为16的倍数
+    np_img = transform.resize(np_img, output_shape=(fixed_h, fixed_w))  # float32
     np_img = np_img.astype(np.uint8)
     
     if split_positions is not None:
@@ -200,7 +211,7 @@ def adjust_img_to_fixed_height(np_img, split_positions=None, fixed_h=560, segmen
     return np_img, split_positions, scale_ratio
 
 
-def adjust_img_to_fixed_height_tf(img_tensor, split_positions, fixed_h=560, segment_task="book_page", text_type="horizontal"):
+def adjust_img_to_fixed_shape_tf(img_tensor, split_positions, fixed_shape=(560, None), feat_stride=16, segment_task="book_page", text_type="horizontal"):
     # rotate 90 degrees rightward.
     text_type = text_type[0].lower()
     if (segment_task, text_type) in (("book_page", "h"), ("double_line", "h"), ("text_line", "v"), ("mix_line", "v")):
@@ -211,11 +222,16 @@ def adjust_img_to_fixed_height_tf(img_tensor, split_positions, fixed_h=560, segm
     img_tensor = tf.cond(channels == 3, lambda: img_tensor, lambda: tf.image.grayscale_to_rgb(img_tensor))
     
     # scale image to fixed size
-    fixed_h = tf.constant(fixed_h, dtype=tf.float32)  # 16的倍数
     raw_shape = tf.cast(tf.shape(img_tensor)[:2], tf.float32)
-    scale_ratio = fixed_h / raw_shape[0]
-    new_size = tf.cast([fixed_h, raw_shape[1] * scale_ratio], dtype=tf.int32)
-    img_tensor = tf.image.resize(img_tensor, size=new_size)  # float32
+    fixed_h, fixed_w = fixed_shape
+    if segment_task in ("book_page", "mix_line", "text_line"):
+        scale_ratio = fixed_h / raw_shape[0]                    # fixed_h是16的倍数, fixed_w为None
+        fixed_w = tf.cast(raw_shape[1] * scale_ratio, tf.int32) # 在打包batch后，将调整为16的倍数
+    else:
+        scale_ratio = fixed_w / raw_shape[1]                    # double_line情况, fixed_h为None, fixed_w是16的倍数
+        fixed_h = tf.cast(raw_shape[0] * scale_ratio, tf.int32)
+        fixed_h += -fixed_h % feat_stride                       # 调整为16的倍数
+    img_tensor = tf.image.resize(img_tensor, size=[fixed_h, fixed_w])  # float32
     img_tensor = tf.cast(img_tensor, dtype=tf.uint8)
     split_positions = split_positions * scale_ratio
     
@@ -276,7 +292,7 @@ def pack_a_batch(imgs_list, split_pos_list, feat_stride=16, background="white"):
 @threadsafe_generator
 def data_generator_with_images(annotation_lines,
                                batch_size,
-                               fixed_h,
+                               fixed_shape,
                                feat_stride=16,
                                segment_task="book_page",
                                text_type="horizontal"):
@@ -289,7 +305,7 @@ def data_generator_with_images(annotation_lines,
         for _ in range(batch_size):
             if i == 0: np.random.shuffle(annotation_lines)
             np_img, split_positions = get_image_and_split_pos(annotation_lines[i], segment_task)
-            np_img, split_positions, _ = adjust_img_to_fixed_height(np_img, split_positions, fixed_h, segment_task, text_type)
+            np_img, split_positions, _ = adjust_img_to_fixed_shape(np_img, split_positions, fixed_shape, feat_stride, segment_task, text_type)
             images_list.append(np_img)
             split_pos_list.append(split_positions)
             i = (i + 1) % n
@@ -337,7 +353,7 @@ def parse_fn(serialized_example, segment_task="book_page"):
 
 def data_generator_with_tfrecords(tfrecords_files,
                                   batch_size,
-                                  fixed_h,
+                                  fixed_shape,
                                   feat_stride=16,
                                   segment_task="book_page",
                                   text_type="horizontal"):
@@ -361,7 +377,7 @@ def data_generator_with_tfrecords(tfrecords_files,
         split_positions = tf.tile(split_positions[:, tf.newaxis], multiples=[1, 2])
         split_positions = tf.cast(split_positions, tf.float32)
 
-        img_tensor, split_positions = adjust_img_to_fixed_height_tf(img_tensor, split_positions, fixed_h, segment_task, text_type)
+        img_tensor, split_positions = adjust_img_to_fixed_shape_tf(img_tensor, split_positions, fixed_shape, feat_stride, segment_task, text_type)
         img_width = tf.cast(tf.shape(img_tensor)[1], tf.float32)
         
         return img_tensor, img_width, split_positions
@@ -374,7 +390,8 @@ def data_generator_with_tfrecords(tfrecords_files,
         batch_imgs = tf.cast(batch_imgs, tf.float32)
         inputs_dict = {"batch_images": batch_imgs, "real_images_width": real_images_width, "split_lines_pos": split_positions}
         return  inputs_dict
-
+    
+    fixed_h = fixed_shape[0]    # None if segment_task is double_line.
     padded_shapes = (tf.TensorShape([fixed_h, None, 3]), tf.TensorShape([]), tf.TensorShape([None, 2]))
     padding_values = (tf.constant(255, tf.uint8), tf.constant(-1, tf.float32), tf.constant(-1, tf.float32))
     data_set = (data_set
@@ -390,7 +407,7 @@ def data_generator_with_tfrecords(tfrecords_files,
 
 def data_generator(data_file, src_type="images", segment_task="book_page", text_type="horizontal", validation_split=0.1):
     """data generator for fit_generator"""
-    batch_size, fixed_h, feat_stride = get_segment_task_params(segment_task)
+    batch_size, fixed_shape, feat_stride = get_segment_task_params(segment_task)
     
     with open(data_file, "r", encoding="utf8") as fr:
         lines = [line.strip() for line in fr.readlines()]
@@ -400,11 +417,11 @@ def data_generator(data_file, src_type="images", segment_task="book_page", text_
     np.random.shuffle(train_lines)
     
     if src_type == "images":
-        training_generator = data_generator_with_images(train_lines, batch_size, fixed_h, feat_stride, segment_task, text_type)
-        validation_generator = data_generator_with_images(validation_lines, batch_size, fixed_h, feat_stride, segment_task, text_type)
+        training_generator = data_generator_with_images(train_lines, batch_size, fixed_shape, feat_stride, segment_task, text_type)
+        validation_generator = data_generator_with_images(validation_lines, batch_size, fixed_shape, feat_stride, segment_task, text_type)
     elif src_type == "tfrecords":
-        training_generator = data_generator_with_tfrecords(train_lines, batch_size, fixed_h, feat_stride, segment_task, text_type)
-        validation_generator = data_generator_with_tfrecords(validation_lines, batch_size, fixed_h, feat_stride, segment_task, text_type)
+        training_generator = data_generator_with_tfrecords(train_lines, batch_size, fixed_shape, feat_stride, segment_task, text_type)
+        validation_generator = data_generator_with_tfrecords(validation_lines, batch_size, fixed_shape, feat_stride, segment_task, text_type)
     else:
         ValueError("Optional src type: 'images', 'tfrecords'.")
         

@@ -18,7 +18,7 @@ def split_line_regress_loss(split_line_delta, pred_delta, interval_mask):
     loss = smooth_l1_loss(split_line_delta, pred_delta)
     loss = tf.reduce_sum(loss, axis=-1) * interval_mask
     
-    return tf.reduce_sum(loss) / tf.reduce_sum(interval_mask)
+    return tf.reduce_sum(loss) / (tf.reduce_sum(interval_mask) + 1e-5)  # 防止零除而出现Nan
     
 
 def smooth_l1_loss(y_true, y_predict, sigma2=9.0):

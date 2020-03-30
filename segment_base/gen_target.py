@@ -7,13 +7,15 @@ from tensorflow.keras import backend as K
 
 
 class SegmentTarget(layers.Layer):
-    def __init__(self, feat_stride=16, label_smoothing=0.1, pos_weight=2., neg_weight=1., pad_weight=1., cls_score_thresh=0.7, **kwargs):
+    def __init__(self, feat_stride=16, label_smoothing=0.1,
+                 pos_weight=2., neg_weight=1., pad_weight=1., cls_score_thresh=0.7, segment_task="book_page", **kwargs):
         self.feat_stride = feat_stride
         self.label_smoothing = label_smoothing
         self.pos_weight = pos_weight
         self.neg_weight = neg_weight
         self.pad_weight = pad_weight
         self.cls_score_thresh = cls_score_thresh
+        self.segment_task = segment_task
         super(SegmentTarget, self).__init__(**kwargs)
     
     def call(self, inputs, **kwargs):
@@ -53,26 +55,27 @@ class SegmentTarget(layers.Layer):
         
         split_line_delta = (interval_split_line - interval_center) / self.feat_stride
         
-        # 抽样，使正负样本均衡（主要针对text_line切分任务）
         num_positive = tf.shape(target_indices)[0]
-        num_negative = num_positive * tf.cast(self.pos_weight / self.neg_weight, tf.int32)
+        if self.segment_task in ("text_line",):
+            # 抽样，使正负样本均衡（主要针对text_line切分任务）
+            num_negative = num_positive * tf.cast(self.pos_weight / self.neg_weight, tf.int32)
+        else:
+            # 对于double_line, mix_line切分任务来说, 不需要抽样（或者说全部作为样本）
+            num_negative = batch_size * feat_width - num_positive # * 3
         
-        # 对于double_line, mix_line切分任务来说, 不需要抽样（或者说全部作为样本）
-        num_negative = tf.where(num_positive < 5 * batch_size, batch_size * feat_width - 3 * num_positive, num_negative)
+        if self.segment_task in ("text_line",):
+            nearby_maximum = tf.nn.max_pool1d(interval_mask[..., tf.newaxis], ksize=3, strides=1, padding="SAME")   # zero padding
+            nearby_maximum = tf.reshape(nearby_maximum, shape=tf.shape(nearby_maximum)[:2])
+            # _neg_indices = tf.where(nearby_maximum == 0.)  # pure negative indices, sample method 2
+            
+            pred_scores = K.sigmoid(pred_cls_logit) # 抽样那些预测出错的负类，针对性学习, sample method 3
+            neg_indices_wrong = tf.where(tf.logical_and(nearby_maximum == 0., pred_scores >= self.cls_score_thresh))
+            neg_indices_right = tf.where(tf.logical_and(nearby_maximum == 0., pred_scores < self.cls_score_thresh))
+            _neg_indices = tf.concat([neg_indices_wrong, tf.random.shuffle(neg_indices_right)], axis=0)
+        else:
+            _neg_indices = tf.where(interval_mask == 0.) # sample method 1
         
-        nearby_maximum = tf.nn.max_pool1d(interval_mask[..., tf.newaxis], ksize=3, strides=1, padding="SAME")   # zero padding
-        nearby_maximum = tf.reshape(nearby_maximum, shape=tf.shape(nearby_maximum)[:2])
-        
-        # neg_indices = tf.where(interval_mask == 0.)       # sample method 1
-        pure_neg_indices = tf.where(nearby_maximum == 0.)   # sample method 2
-        # neg_indices = tf.random.shuffle(pure_neg_indices)[:num_negative]
-        
-        # sample method 3
-        pred_scores = K.sigmoid(pred_cls_logit) # 抽样那些预测出错的类别，针对性学习
-        neg_indices_wrong = tf.where(tf.logical_and(nearby_maximum == 0., pred_scores >= self.cls_score_thresh))
-        neg_indices_right = tf.where(tf.logical_and(nearby_maximum == 0., pred_scores < self.cls_score_thresh))
-        neg_indices = tf.concat([neg_indices_wrong, tf.random.shuffle(neg_indices_right)], axis=0)[:num_negative]
-        
+        neg_indices = _neg_indices[:num_negative]
         neg_flag = tf.ones_like(neg_indices[:, 0], dtype=tf.float32)
         neg_flag = tf.scatter_nd(indices=neg_indices, updates=neg_flag, shape=[batch_size, feat_width]) # 抽样结果
         
@@ -85,7 +88,7 @@ class SegmentTarget(layers.Layer):
         
         # summary, 用作度量的必须是浮点类型
         num_pos = tf.cast(num_positive, tf.float32)
-        num_neg = tf.cast(tf.shape(pure_neg_indices)[0], tf.float32)
+        num_neg = tf.cast(tf.shape(_neg_indices)[0], tf.float32)
         
         return interval_cls_goals, split_line_delta, interval_mask, inside_weights, num_pos, num_neg
         
