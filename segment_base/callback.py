@@ -32,9 +32,9 @@ def get_callbacks(segment_task, model_struc="densenet_gru"):
         save_weights_only=True)
     
     lr_reducer = ReduceLROnPlateau(monitor='val_loss',
-                                   factor=0.2,
+                                   factor=0.6,
                                    cooldown=0,
-                                   patience=2,  # num of epochs
+                                   patience=3,  # num of epochs
                                    min_lr=0)
     
     check_or_makedirs(logs_dir)

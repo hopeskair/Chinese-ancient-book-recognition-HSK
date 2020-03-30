@@ -7,9 +7,9 @@ from config import SEGMENT_DOUBLE_LINE_TAGS_FILE_H, SEGMENT_DOUBLE_LINE_TAGS_FIL
 from config import SEGMENT_DOUBLE_LINE_TFRECORDS_H, SEGMENT_DOUBLE_LINE_TFRECORDS_V
 
 def main():
-    train(data_file=SEGMENT_DOUBLE_LINE_TFRECORDS_H,
+    train(data_file=SEGMENT_DOUBLE_LINE_TFRECORDS_V,
           src_type="tfrecords",
-          text_type="horizontal",
+          text_type="vertical",
           segment_task="double_line",
           epochs=100,
           init_epochs=0,

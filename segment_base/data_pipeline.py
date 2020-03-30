@@ -18,7 +18,7 @@ from config import SEGMENT_TASK_ID, SEGMENT_ID_TO_TASK
 def image_preprocess_tf(images, stage="train"):
     convert_imgs = tf.image.per_image_standardization(images)
     if stage == "train":
-        convert_imgs = tf.cond(tf.random.uniform([]) < 0.5, lambda: convert_imgs, lambda: 1. - convert_imgs)
+        convert_imgs = tf.cond(tf.random.uniform([]) < 0.5, lambda: convert_imgs, lambda: -convert_imgs)
     return convert_imgs
 
 

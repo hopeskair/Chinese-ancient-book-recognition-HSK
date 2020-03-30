@@ -187,8 +187,9 @@ def compute_acc(inputs):
     neg_pred_result = tf.where(real_cls_ids == 0., total_pred_result, 0)
     
     total_accuracy = tf.reduce_mean(total_pred_result)
-    pos_accuracy = tf.reduce_sum(pos_pred_result) / (tf.reduce_sum(real_cls_ids) + 1e-5)    # 防止零除而出现Nan
     neg_accuracy = tf.reduce_sum(neg_pred_result) / tf.reduce_sum(1 - real_cls_ids)
+    num_pos = tf.reduce_sum(real_cls_ids)
+    pos_accuracy = tf.where(num_pos == 0., 1., tf.reduce_sum(pos_pred_result) / num_pos)  # 防止零除而出现Nan
     
     return total_accuracy, pos_accuracy, neg_accuracy
 

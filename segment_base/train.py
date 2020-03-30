@@ -45,12 +45,12 @@ def main(data_file, src_type, text_type, segment_task, epochs, init_epochs=0, mo
     
     summary_writer = tf.summary.create_file_writer(logs_dir)
     callbacks = get_callbacks(segment_task, model_struc)
-    steps_per_epoch = 2000
-    for epoch in range(init_epochs, init_epochs + epochs):
+    steps_per_epoch = 200
+    for epoch in range(init_epochs, init_epochs + epochs, 5):
         # 开始训练
         train_model.fit_generator(generator=training_generator,
                                   steps_per_epoch=steps_per_epoch,
-                                  epochs=epoch+1,
+                                  epochs=epoch+5,
                                   initial_epoch=epoch,
                                   verbose=1,
                                   validation_data=validation_generator,
