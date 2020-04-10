@@ -4,9 +4,9 @@
 import os
 from tensorflow.keras import backend, optimizers, callbacks
 
-from recognition_crnn.model import CRNN
-from recognition_crnn.data_pipeline import create_text_lines_batch
-from recognition_crnn.data_pipeline import load_text_lines_batch
+from recog_with_crnn.model import CRNN
+from recog_with_crnn.data_pipeline import create_text_lines_batch
+from recog_with_crnn.data_pipeline import load_text_lines_batch
 
 from config import CRNN_CKPT_DIR, BATCH_SIZE_TEXT_LINE
 from util import check_or_makedirs

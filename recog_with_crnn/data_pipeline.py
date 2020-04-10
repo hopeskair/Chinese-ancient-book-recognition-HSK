@@ -7,8 +7,8 @@ import numpy as np
 from PIL import Image
 from multiprocessing import Queue, Process
 
-from recognition_crnn.utils import resize_text_image
-from recognition_crnn.utils import dense_tensor_from_list
+from recog_with_crnn.utils import resize_text_image
+from recog_with_crnn.utils import dense_tensor_from_list
 from data_generator.generate_text_lines import create_text_line
 
 from util import CHAR2ID_DICT

@@ -160,8 +160,8 @@ CTPN_TEXT_LINE_NMS_THRESH = 0.3
 
 # **************************** Model crnn ********************************
 # text line recognition
-CRNN_CKPT_DIR = os.path.join(CURR_DIR, "recognition_crnn", "ckpt")
-CRNN_LOGS_DIR = os.path.join(CURR_DIR, "recognition_crnn", "logs")
+CRNN_CKPT_DIR = os.path.join(CURR_DIR, "recog_with_crnn", "ckpt")
+CRNN_LOGS_DIR = os.path.join(CURR_DIR, "recog_with_crnn", "logs")
 # **************************** Model crnn ********************************
 
 

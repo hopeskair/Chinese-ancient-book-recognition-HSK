@@ -6,9 +6,9 @@ import numpy as np
 from PIL import Image
 from tensorflow.keras import backend
 
-from recognition_crnn.model import CRNN
-from recognition_crnn.utils import resize_text_image
-from recognition_crnn.utils import sparse_tensor_to_list
+from recog_with_crnn.model import CRNN
+from recog_with_crnn.utils import resize_text_image
+from recog_with_crnn.utils import sparse_tensor_to_list
 
 from config import TEXT_LINE_SIZE
 from config import CRNN_CKPT_DIR
