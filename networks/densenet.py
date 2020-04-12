@@ -167,3 +167,10 @@ def DenseNet26_segment_double_line(inputs, feat_stride=16, scope="densenet"): # 
         outputs = DenseNet(inputs, blocks=blocks)  # 1/16 or 1/32
         # outputs = DenseNet(inputs, blocks=[1, 1, 1, 1])  # for test
     return outputs
+
+
+def DenseNet60_for_char_recog(inputs, scope="densenet"):
+    with backend.name_scope(scope):
+        outputs = DenseNet(inputs, blocks=[3, 9, 8, 8])  # 1/16 size
+        # outputs = DenseNet(inputs, blocks=[1, 1, 1, 1])  # for test
+    return outputs

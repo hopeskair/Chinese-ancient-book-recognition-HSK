@@ -251,3 +251,16 @@ def ResNet40V2_segment_double_line(inputs, feat_stride=16, scope="resnet"):
         outputs = ResNet(inputs, stack_fn, use_bias=True, block_preact=True)
     
     return outputs
+
+
+def ResNet58V2_for_char_recog(inputs, scope="resnet"):
+    def stack_fn(x):
+        x = stack2(x, 64, 3, name='conv2')
+        x = stack2(x, 128, 8, name='conv3')  # 1/8 size
+        x = stack2(x, 256, 8, name='conv4')  # 1/16 size
+        return x
+    
+    with backend.name_scope(scope):
+        outputs = ResNet(inputs, stack_fn, use_bias=True, block_preact=True)  # 1/16 size
+    
+    return outputs

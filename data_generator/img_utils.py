@@ -13,8 +13,7 @@ from config import CHAR_IMG_SIZE, MAX_ROTATE_ANGLE
 
 
 # 先生成比目标size稍大的图片，图片处理(旋转裁剪)之后，再缩放至目标大小
-# 如果直接生成目标大小的图片，生成的字会更小，经过其他处理后，再放大时图片失真严重
-# 这样也与处理外部图片的方式更加相似
+# 如果直接生成目标大小的图片，生成的字会更小，裁剪之后还需要再次放大
 def generate_bigger_image_by_font(chinese_char, font_file, image_size=int(CHAR_IMG_SIZE*1.2)):
     height = width = image_size
 

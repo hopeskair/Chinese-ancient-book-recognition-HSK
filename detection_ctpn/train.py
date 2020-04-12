@@ -61,7 +61,7 @@ def main(data_file, src_type, text_type, epochs, init_epochs=0, model_struc="den
     load_path = os.path.join(CTPN_CKPT_DIR, model_struc + "_" + text_type + "_ctpn_{:04d}.h5".format(init_epochs))
     weights_path = weights_path if os.path.exists(weights_path) else load_path
     if os.path.exists(weights_path):
-        train_model.load_weights(load_path, by_name=True)
+        train_model.load_weights(weights_path, by_name=True)
         print("\nLoad model weights from %s\n"%weights_path)
     
     training_generator, validation_generator = data_generator(data_file=data_file,

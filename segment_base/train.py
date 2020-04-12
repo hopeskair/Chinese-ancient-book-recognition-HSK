@@ -35,7 +35,7 @@ def main(data_file, src_type, text_type, segment_task, epochs, init_epochs=0, mo
     load_path = os.path.join(ckpt_dir, segment_task + "_segment_" + model_struc + "_{:04d}.h5".format(init_epochs))
     weights_path = weights_path if os.path.exists(weights_path) else load_path
     if os.path.exists(weights_path):
-        train_model.load_weights(load_path, by_name=True)
+        train_model.load_weights(weights_path, by_name=True)
         print("\nLoad model weights from %s\n"%weights_path)
     
     training_generator, validation_generator = data_generator(data_file=data_file,

@@ -11,7 +11,7 @@ import tensorflow as tf
 
 from util import CHAR2ID_DICT, BLANK_CHAR
 from config import CHAR_IMG_SIZE, NUM_IMAGES_PER_FONT
-from config import FONT_FILE_DIR, FONT_FINISHED_DIR, EXTERNEL_IMAGES_DIR
+from config import FONT_FILE_DIR, EXTERNEL_IMAGES_DIR
 from config import CHAR_IMGS_DIR, CHAR_TFRECORDS_DIR
 
 from util import check_or_makedirs, remove_then_makedirs
@@ -41,10 +41,10 @@ def generate_all_chinese_images_bigger(font_file, image_size=int(CHAR_IMG_SIZE*1
 # 生成样例图片，以便检查图片的有效性
 def generate_chinese_images_to_check(obj_size=CHAR_IMG_SIZE, augmentation=False):
     print("Get font_file_list ...")
-    font_file_list = [os.path.join(FONT_FILE_DIR, font_name) for font_name in os.listdir(FONT_FILE_DIR)]
+    font_file_list = [os.path.join(FONT_FILE_DIR, font_name) for font_name in os.listdir(FONT_FILE_DIR)
+                      if font_name.lower()[-4:] in (".otf", ".ttf", ".ttc")]
     # font_file_list = [os.path.join(FONT_FINISHED_DIR, "chinese_fonts_暂时移出/康熙字典体完整版本.otf")]
     
-    check_or_makedirs(FONT_FINISHED_DIR)
     chinese_char_num = len(CHAR2ID_DICT)
     total_num = len(font_file_list) * chinese_char_num
     count = 0
@@ -55,18 +55,18 @@ def generate_chinese_images_to_check(obj_size=CHAR_IMG_SIZE, augmentation=False)
         # 创建保存该字体图片的目录
         font_img_dir = os.path.join(CHAR_IMGS_DIR, font_type)
         remove_then_makedirs(font_img_dir)
-
+        
         for chinese_char, bigger_PIL_img in generate_all_chinese_images_bigger(font_file, image_size=int(obj_size*1.2)):
             # 检查生成的灰度图像是否可用，黑底白字
             image_data = list(bigger_PIL_img.getdata())
             if sum(image_data) < 10:
                 continue
-
+            
             if not augmentation:
                 PIL_img = get_standard_image(bigger_PIL_img, obj_size, reverse_color=True)
             else:
                 PIL_img = get_augmented_image(bigger_PIL_img, obj_size, rotation=True, dilate=False, erode=True, reverse_color=True)
-
+            
             # 保存生成的字体图片
             image_name = chinese_char + ".jpg"
             save_path = os.path.join(font_img_dir, image_name)
@@ -77,14 +77,13 @@ def generate_chinese_images_to_check(obj_size=CHAR_IMG_SIZE, augmentation=False)
             if count % 200 == 0:
                 print("Progress bar: %.2f%%" % (count*100/total_num))
                 sys.stdout.flush()
-        shutil.move(src=font_file, dst=os.path.join(FONT_FINISHED_DIR, font_name))
     return
 
 
 def generate_chinese_images(obj_size=CHAR_IMG_SIZE, num_imgs_per_font=NUM_IMAGES_PER_FONT):
     print("Get font_file_list ...")
-    font_file_list = [os.path.join(FONT_FILE_DIR, font_name) for font_name in os.listdir(FONT_FILE_DIR)]
-    check_or_makedirs(FONT_FINISHED_DIR)
+    font_file_list = [os.path.join(FONT_FILE_DIR, font_name) for font_name in os.listdir(FONT_FILE_DIR)
+                      if font_name.lower()[-4:] in (".otf", ".ttf", ".ttc")]
 
     print("Begin to generate images ...")
     chinese_char_num = len(CHAR2ID_DICT)
@@ -119,16 +118,13 @@ def generate_chinese_images(obj_size=CHAR_IMG_SIZE, num_imgs_per_font=NUM_IMAGES
             if count % 200 == 0:
                 print("Progress bar: %.2f%%" % (count*100/total_num))
                 sys.stdout.flush()
-        shutil.move(src=font_file, dst=os.path.join(FONT_FINISHED_DIR, font_name))
-    return
 
 
 def generate_tfrecords(obj_size=CHAR_IMG_SIZE, num_imgs_per_font=NUM_IMAGES_PER_FONT):
     print("Get font_file_list ...")
-    font_file_list = [os.path.join(FONT_FILE_DIR, font_name) for font_name in os.listdir(FONT_FILE_DIR)]
-    font_files_num = len(font_file_list)
-    check_or_makedirs(FONT_FINISHED_DIR)
-
+    font_file_list = [os.path.join(FONT_FILE_DIR, font_name) for font_name in os.listdir(FONT_FILE_DIR)
+                      if font_name.lower()[-4:] in (".otf", ".ttf", ".ttc")]
+    
     # 创建保存tfrecords文件的目录
     check_or_makedirs(CHAR_TFRECORDS_DIR)
 
@@ -138,15 +134,14 @@ def generate_tfrecords(obj_size=CHAR_IMG_SIZE, num_imgs_per_font=NUM_IMAGES_PER_
     # 若直接把同一字体同一个字的多张图片连续放到同一个tfrecords里，那么训练batch的多样性不好
     writers_list = \
         [tf.io.TFRecordWriter(os.path.join(CHAR_TFRECORDS_DIR, "chinese_imgs_%d_from_font.tfrecords" % i))
-         for i in range(font_files_num*2)]
+         for i in range(20)]
     
     print("Begin to generate images ...")
     chinese_char_num = len(CHAR2ID_DICT)
-    total_num = font_files_num * chinese_char_num
+    total_num = len(font_file_list) * chinese_char_num
     count = 0
     for font_file in font_file_list:  # 外层循环是字体
-        font_name = os.path.basename(font_file)
-
+        
         for chinese_char, bigger_PIL_img in generate_all_chinese_images_bigger(font_file, image_size=int(obj_size * 1.2)):  # 内层循环是字
             # 检查生成的灰度图像是否可用，黑底白字
             image_data = list(bigger_PIL_img.getdata())
@@ -159,19 +154,17 @@ def generate_tfrecords(obj_size=CHAR_IMG_SIZE, num_imgs_per_font=NUM_IMAGES_PER_
 
             # 保存生成的字体图片
             for PIL_img in PIL_img_list:
-                # train_set和test_set的比例约为 5:1
                 writer = random.choice(writers_list)
 
                 bytes_image = PIL_img.tobytes()  # 将图片转化为原生bytes
                 bytes_char = chinese_char.encode('utf-8')
-                label = CHAR2ID_DICT[chinese_char]
                 example = tf.train.Example(
                     features=tf.train.Features(
                         feature={
                             'bytes_image': tf.train.Feature(bytes_list=tf.train.BytesList(value=[bytes_image])),
-                            # 为了检查图片和标签是否对应，把汉字的utf-8编码也加进去
-                            'bytes_char': tf.train.Feature(bytes_list=tf.train.BytesList(value=[bytes_char])),
-                            'label': tf.train.Feature(int64_list=tf.train.Int64List(value=[label]))
+                            'img_height': tf.train.Feature(int64_list=tf.train.Int64List(value=[PIL_img.height])),
+                            'img_width': tf.train.Feature(int64_list=tf.train.Int64List(value=[PIL_img.width])),
+                            'bytes_char': tf.train.Feature(bytes_list=tf.train.BytesList(value=[bytes_char]))
                         }))
                 writer.write(example.SerializeToString())
 
@@ -180,11 +173,9 @@ def generate_tfrecords(obj_size=CHAR_IMG_SIZE, num_imgs_per_font=NUM_IMAGES_PER_
             if count % 200 == 0:
                 print("Progress bar: %.2f%%" % (count*100/total_num))
                 sys.stdout.flush()
-        shutil.move(src=font_file, dst=os.path.join(FONT_FINISHED_DIR, font_name))
 
     # 关闭所有的tfrecords写者
     [writer.close() for writer in writers_list]
-    return
 
 
 """ ************************* 已有图片转化得到训练图片 ************************ """
@@ -219,10 +210,10 @@ def convert_chinese_images_to_check(obj_size=CHAR_IMG_SIZE, augmentation=True):
         # 创建保存该字体图片的目录
         font_img_dir = os.path.join(CHAR_IMGS_DIR, font_type)
         remove_then_makedirs(font_img_dir)
-
+        
         for image_path in image_paths_list:
             # 加载外部图片，将图片调整为正方形
-            # 为了保证图片旋转时不丢失信息，生成的图片应该比本来的图片稍微bigger
+            # 为了保证图片旋转时不丢失信息，生成的图片比本来的图片稍微bigger
             # 为了方便图片的后续处理，图片必须加载为黑底白字，可以用reverse_color来调整
             try:
                 bigger_PIL_img = load_external_image_bigger(image_path, white_background=True, reverse_color=True)
@@ -245,7 +236,6 @@ def convert_chinese_images_to_check(obj_size=CHAR_IMG_SIZE, augmentation=True):
             if count % 200 == 0:
                 print("Progress bar: %.2f%%" % (count*100/total_num))
                 sys.stdout.flush()
-    return
 
 
 def convert_chinese_images(obj_size=CHAR_IMG_SIZE, num_imgs_per_font=NUM_IMAGES_PER_FONT):
@@ -265,7 +255,7 @@ def convert_chinese_images(obj_size=CHAR_IMG_SIZE, num_imgs_per_font=NUM_IMAGES_
         
         for image_path in image_paths_list:
             # 加载外部图片，将图片调整为正方形
-            # 为了保证图片旋转时不丢失信息，生成的图片应该比本来的图片稍微bigger
+            # 为了保证图片旋转时不丢失信息，生成的图片比本来的图片稍微bigger
             # 为了方便图片的后续处理，图片必须加载为黑底白字，可以用reverse_color来调整
             try:
                 bigger_PIL_img = load_external_image_bigger(image_path, white_background=True, reverse_color=True)
@@ -276,7 +266,7 @@ def convert_chinese_images(obj_size=CHAR_IMG_SIZE, num_imgs_per_font=NUM_IMAGES_
             PIL_img_list = \
                 [get_augmented_image(bigger_PIL_img, obj_size, rotation=True, dilate=False, erode=True, reverse_color=True)
                  for i in range(num_imgs_per_font)]
-
+            
             # 保存生成的字体图片
             for index, PIL_img in enumerate(PIL_img_list):
                 image_name = os.path.basename(image_path).split(".")[0] + "_" + str(index) + ".jpg"
@@ -288,7 +278,6 @@ def convert_chinese_images(obj_size=CHAR_IMG_SIZE, num_imgs_per_font=NUM_IMAGES_
             if count % 200 == 0:
                 print("Progress bar: %.2f%%" % (count * 100 / total_num))
                 sys.stdout.flush()
-    return
 
 
 def convert_tfrecords(obj_size=CHAR_IMG_SIZE, num_imgs_per_font=NUM_IMAGES_PER_FONT):
@@ -296,18 +285,17 @@ def convert_tfrecords(obj_size=CHAR_IMG_SIZE, num_imgs_per_font=NUM_IMAGES_PER_F
     font_images_num_list = [len(os.listdir(os.path.join(EXTERNEL_IMAGES_DIR, content)))
                             for content in os.listdir(EXTERNEL_IMAGES_DIR)
                             if os.path.isdir(os.path.join(EXTERNEL_IMAGES_DIR, content))]
-    font_category_num = len(font_images_num_list)
     
     # 创建保存tfrecords文件的目录
     check_or_makedirs(CHAR_TFRECORDS_DIR)
-
+    
     # 可以把变换的图片直接存入tfrecords文件
     # 不必将变换的图片先保存到磁盘，再从磁盘读取出来保存到tfrecords文件，这样效率太低
     # 通常是用一种字体的一个字图片增强出很多个图片，这些图片最好是分开存放
     # 若直接把同一字体同一个字图片增强出的多张图片连续放到同一个tfrecords里，那么每一个训练batch的多样性就不好
     writers_list = \
         [tf.io.TFRecordWriter(os.path.join(CHAR_TFRECORDS_DIR, "chinese_imgs_%d_from_img.tfrecords" % i))
-         for i in range(font_category_num*2)]
+         for i in range(20)]
 
     print("Begin to convert images ...")
     total_num = sum(font_images_num_list)
@@ -318,7 +306,7 @@ def convert_tfrecords(obj_size=CHAR_IMG_SIZE, num_imgs_per_font=NUM_IMAGES_PER_F
             chinese_char = os.path.basename(image_path)[0]
 
             # 加载外部图片，将图片调整为正方形
-            # 为了保证图片旋转时不丢失信息，生成的图片应该比本来的图片稍微bigger
+            # 为了保证图片旋转时不丢失信息，生成的图片比本来的图片稍微bigger
             # 为了方便图片的后续处理，图片必须加载为黑底白字，可以用reverse_color来调整
             try:
                 bigger_PIL_img = load_external_image_bigger(image_path, white_background=True, reverse_color=True)
@@ -337,14 +325,11 @@ def convert_tfrecords(obj_size=CHAR_IMG_SIZE, num_imgs_per_font=NUM_IMAGES_PER_F
 
                 bytes_image = PIL_img.tobytes()  # 将图片转化为原生bytes
                 bytes_char = chinese_char.encode('utf-8')
-                label = CHAR2ID_DICT[chinese_char]
                 example = tf.train.Example(
                     features=tf.train.Features(
                         feature={
                             'bytes_image': tf.train.Feature(bytes_list=tf.train.BytesList(value=[bytes_image])),
-                            # 为了检查图片和标签是否对应，把汉字的utf-8编码也加进去
                             'bytes_char': tf.train.Feature(bytes_list=tf.train.BytesList(value=[bytes_char])),
-                            'label': tf.train.Feature(int64_list=tf.train.Int64List(value=[label]))
                         }))
                 writer.write(example.SerializeToString())
 
@@ -356,7 +341,6 @@ def convert_tfrecords(obj_size=CHAR_IMG_SIZE, num_imgs_per_font=NUM_IMAGES_PER_F
 
     # 关闭所有的 tfrecords writer
     [writer.close() for writer in writers_list]
-    return
 
 
 """ ****************** 检查生成的tfrecords文件是否可用 ******************* """
@@ -370,16 +354,15 @@ def display_tfrecords(tfrecords_file):
             serialized_example,
             features={
                 'bytes_image': tf.io.FixedLenFeature([], tf.string),
-                'bytes_char': tf.io.FixedLenFeature([], tf.string),
-                'label': tf.io.FixedLenFeature([], tf.int64)
+                'img_height': tf.io.FixedLenFeature([], tf.int64),
+                'img_width': tf.io.FixedLenFeature([], tf.int64),
+                'bytes_char': tf.io.FixedLenFeature([], tf.string)
             })
 
     data_set = data_set.map(parse_func)
     
     for features in data_set.take(1):
         bytes_char = features['bytes_char']
-        label = tf.cast(features['label'], tf.int32)
-    
         bytes_image = features['bytes_image']                               # 第一种处理方法
         raw_image = tf.io.decode_raw(bytes_image, tf.uint8)                 # 第二种处理方法
         image = tf.reshape(raw_image, shape=(CHAR_IMG_SIZE, CHAR_IMG_SIZE)) # 第三种处理方法
@@ -387,9 +370,7 @@ def display_tfrecords(tfrecords_file):
         # *************************
         print(bytes_char)
         chinese_char = bytes_char.numpy().decode("utf-8")
-        
-        print(label)
-        label_id = label.numpy()
+        label_id = CHAR2ID_DICT(chinese_char)
 
         print(bytes_image)  # 第一种处理方法
         # PIL_img = Image.frombytes(mode="L", size=(CHAR_IMG_SIZE, CHAR_IMG_SIZE), data=bytes_image.numpy())

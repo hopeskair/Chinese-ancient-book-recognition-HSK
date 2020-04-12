@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# Author: hushukai
 
 import os
 import sys
@@ -9,7 +10,7 @@ from tensorflow.keras import backend as K
 
 from segment_base import visualize
 from segment_base.model import work_net
-from segment_base.data_pipeline import adjust_img_to_fixed_height, restore_original_angle
+from segment_base.data_pipeline import adjust_img_to_fixed_shape, restore_original_angle
 from segment_base.utils import get_segment_task_path, get_segment_task_params
 
 from util import check_or_makedirs
@@ -33,7 +34,7 @@ def load_images(img_path):
 def main(img_path, dest_dir, segment_task="book_page", text_type="horizontal", model_struc="densenet_gru", weights_path=""):
     check_or_makedirs(dest_dir)
     K.set_learning_phase(False)
-    _, fixed_h, _ = get_segment_task_params(segment_task)
+    _, fixed_shape, feat_stride = get_segment_task_params(segment_task)
     _, ckpt_dir, logs_dir = get_segment_task_path(segment_task)
     if not os.path.exists(weights_path):
         weights_path = os.path.join(ckpt_dir, model_struc + "_ctpn_finished.h5")
@@ -49,7 +50,9 @@ def main(img_path, dest_dir, segment_task="book_page", text_type="horizontal", m
     for raw_np_img, img_name in load_images(img_path):
         count += 1
 
-        np_img, _, scale_ratio = adjust_img_to_fixed_height(raw_np_img, fixed_h=fixed_h, segment_task="book_page", text_type="horizontal")
+        np_img, _, scale_ratio = adjust_img_to_fixed_shape(raw_np_img,
+                                                           fixed_shape=fixed_shape, feat_stride=feat_stride,
+                                                           segment_task=segment_task, text_type=text_type)
         batch_images = np_img[np.newaxis, :, :, :]
         
         split_positions, scores = segment_model.predict(x=batch_images)         # 模型预测

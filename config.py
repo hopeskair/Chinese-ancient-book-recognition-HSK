@@ -294,3 +294,20 @@ SEGMENT_LINE_WEIGHTS = {
     "pad_space": 1.
 }
 # ************************** Segment model *******************************
+
+
+# ********** Chinese character & components recognition model ************
+CHAR_RECOG_ROOT_DIR = os.path.join(CURR_DIR, "recog_with_components")
+CHAR_RECOG_CKPT_DIR = os.path.join(CURR_DIR, "recog_with_components", "ckpt")
+CHAR_RECOG_LOGS_DIR = os.path.join(CURR_DIR, "recog_with_components", "logs")
+
+CHAR_RECOG_BATCH_SIZE = 128
+
+COMPO_SCORE_THRESH = 0.8
+COMPO_SCORE_ADJUSTMENT_SCALE = 0.1
+
+CHAE_RECOG_LOSS_WEIGHTS = {
+    "chinese_cls_loss": 1.,
+    "chinese_compo_loss": 1.
+}
+# ********** Chinese character & components recognition model ************

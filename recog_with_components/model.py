@@ -34,8 +34,8 @@ def CNN(inputs, scope="densenet"):
 def build_model(num_chars, num_compo, stage="test", img_size=64, model_struc="densenet"):
     
     batch_images = layers.Input(shape=[img_size, img_size, 3], name='batch_images')
-    chinese_char_ids = layers.Input(shape=[], name='chinese_char_ids')
-    compo_embeddings = layers.Input(shape=[num_compo], name='compo_embeddings')
+    chinese_char_ids = layers.Input(shape=[], dtype=tf.int32, name='chinese_char_ids')
+    compo_embeddings = layers.Input(shape=[num_compo], dtype=tf.int8, name='compo_embeddings')
     
     # ******************** Build *********************
     # image normalization
@@ -81,12 +81,11 @@ def work_net(num_chars, num_compo, stage="test", img_size=64, model_struc="dense
     # class_indices, class_scores, compo_hit_indices, compo_hit_scores, combined_pred1, combined_pred2 = targets
     
     # *********************** Summary *************************
-    all_summary = layers.Lambda(summary_fn, name="summary_fn")([chinese_char_ids, targets])
+    summary_metrics = layers.Lambda(summary_fn, name="summary_fn")([chinese_char_ids, targets])
     
     # ********************* Define model **********************
     if stage == 'train':
-        train_model = models.Model(inputs=recog_model.inputs, outputs=[class_loss, compo_loss, all_summary])
-        return train_model
+        return models.Model(inputs=recog_model.inputs, outputs=[class_loss, compo_loss, summary_metrics])
     else:
         return models.Model(inputs=batch_images, outputs=targets)
 
