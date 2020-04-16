@@ -7,7 +7,7 @@ import os
 # ************************ basic configuration ***************************
 # os.getcwd() returns the current working directory
 CURR_DIR = os.path.dirname(__file__)    # .replace("/", os.sep)
-CHINESE_LABEL_FILE = os.path.join(CURR_DIR, "chinese_labels", "chinese_labels_simplified_level1.txt")
+CHINESE_LABEL_FILE = os.path.join(CURR_DIR, "chinese_labels", "chinese_labels_all.txt")
 IGNORABLE_CHARS_FILE = os.path.join(CURR_DIR, "chinese_labels", "ignorable_chars.txt")
 IMPORTANT_CHARS_FILE = os.path.join(CURR_DIR, "chinese_labels", "important_chars.txt")
 # ************************ basic configuration ***************************
@@ -297,17 +297,22 @@ SEGMENT_LINE_WEIGHTS = {
 
 
 # ********** Chinese character & components recognition model ************
+CHINESE_COMPO_ROOT_DIR = os.path.join(CURR_DIR, "chinese_components")
+
 CHAR_RECOG_ROOT_DIR = os.path.join(CURR_DIR, "recog_with_components")
 CHAR_RECOG_CKPT_DIR = os.path.join(CURR_DIR, "recog_with_components", "ckpt")
 CHAR_RECOG_LOGS_DIR = os.path.join(CURR_DIR, "recog_with_components", "logs")
 
-CHAR_RECOG_BATCH_SIZE = 128
+CHAR_IMAGE_PATHS_FILE = os.path.join(CURR_DIR, "recog_with_components", "files", "char_image_paths.txt")
+CHAR_TFRECORDS_PATHS_FILE = os.path.join(CURR_DIR, "recog_with_components", "files", "char_tfrecords_paths.txt")
 
-COMPO_SCORE_THRESH = 0.8
+CHAR_RECOG_BATCH_SIZE = 256
+
+COMPO_SCORE_THRESH = 0.7
 COMPO_SCORE_ADJUSTMENT_SCALE = 0.1
 
 CHAE_RECOG_LOSS_WEIGHTS = {
-    "chinese_cls_loss": 1.,
-    "chinese_compo_loss": 1.
+    "chinese_class_loss": 1.,
+    "chinese_compo_loss": 20.
 }
 # ********** Chinese character & components recognition model ************

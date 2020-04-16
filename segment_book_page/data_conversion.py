@@ -20,6 +20,7 @@ from config import SEGMENT_BOOK_PAGE_TFRECORDS_H, SEGMENT_BOOK_PAGE_TFRECORDS_V
 def convert_annotation(img_sources=None, tfrecords_dir=None, dest_file=None):
     assert [img_sources, tfrecords_dir].count(None) == 1
     
+    check_or_makedirs(os.path.dirname(dest_file))
     with open(dest_file, "w", encoding="utf-8") as fw:
         if img_sources is not None:
             for src_file, root_dir in img_sources:
@@ -57,12 +58,12 @@ def check_tags(tags_file, segment_task, text_type):
 
 
 def main():
-    convert_annotation(img_sources=[(BOOK_PAGE_TAGS_FILE_H, BOOK_PAGE_IMGS_H)], dest_file=SEGMENT_BOOK_PAGE_TAGS_FILE_H)
-    convert_annotation(img_sources=[(BOOK_PAGE_TAGS_FILE_V, BOOK_PAGE_IMGS_V)], dest_file=SEGMENT_BOOK_PAGE_TAGS_FILE_V)
-    convert_annotation(tfrecords_dir=BOOK_PAGE_TFRECORDS_H, dest_file=SEGMENT_BOOK_PAGE_TFRECORDS_H)
+    # convert_annotation(img_sources=[(BOOK_PAGE_TAGS_FILE_H, BOOK_PAGE_IMGS_H)], dest_file=SEGMENT_BOOK_PAGE_TAGS_FILE_H)
+    # convert_annotation(img_sources=[(BOOK_PAGE_TAGS_FILE_V, BOOK_PAGE_IMGS_V)], dest_file=SEGMENT_BOOK_PAGE_TAGS_FILE_V)
+    # convert_annotation(tfrecords_dir=BOOK_PAGE_TFRECORDS_H, dest_file=SEGMENT_BOOK_PAGE_TFRECORDS_H)
     convert_annotation(tfrecords_dir=BOOK_PAGE_TFRECORDS_V, dest_file=SEGMENT_BOOK_PAGE_TFRECORDS_V)
     
-    check_tags(tags_file=SEGMENT_BOOK_PAGE_TAGS_FILE_V, segment_task="book_page", text_type="vertical")
+    # check_tags(tags_file=SEGMENT_BOOK_PAGE_TAGS_FILE_V, segment_task="book_page", text_type="vertical")
 
 
 if __name__ == '__main__':

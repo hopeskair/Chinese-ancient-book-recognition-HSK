@@ -3,3 +3,4 @@ opencv-python
 pillow
 shapely
 scikit-image
+bs4

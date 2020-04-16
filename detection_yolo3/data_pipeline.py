@@ -103,7 +103,7 @@ def data_generator_with_tfrecords(tfrecords_files, batch_size, anchors, num_clas
         
         batch_imgs, batch_boxes = pack_book_pages(imgs_list, boxes_list, background="white")
         y_true = preprocess_true_boxes(batch_boxes, batch_imgs.shape[1:3], anchors, num_classes)
-
+        
         yield [batch_imgs] + y_true, np.zeros(batch_size)
 
 

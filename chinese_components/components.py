@@ -6,15 +6,17 @@ import numpy as np
 
 from chinese_components.crawler import get_char_split_info
 
+from config import CHINESE_COMPO_ROOT_DIR
 
-CHINESE_COMPONENTS_FILE = "char_split_table_normal.txt"
-MISSING_CHARS_FILE = "missing_chars_in_split_table.txt"
-CHINESE_COMPONENTS_CRAWLED = "char_split_table_crawled.txt"
-CHINESE_SPLIT_TABLE = "chinese_split_table.txt"
-SIMILAR_COMPONENTS_FILE = "similar_components.txt"
-CHINESE_SPLIT_TABLE_REPLACED = "chinese_split_table_replaced.txt"
-COMPONENTS_SUMMARY_FILE = "chinese_compo_summary.txt"
-CHINESE_STRUCTURES = {'⿱', '⿰', '⿳', '⿲', '⿸', '⿹', '⿺', '⿶', '⿵', '⿷', '⿴', '⿻'}
+
+CHINESE_COMPONENTS_FILE      = os.path.join(CHINESE_COMPO_ROOT_DIR, "char_split_table_normal.txt")
+MISSING_CHARS_FILE           = os.path.join(CHINESE_COMPO_ROOT_DIR, "missing_chars_in_split_table.txt")
+CHINESE_COMPONENTS_CRAWLED   = os.path.join(CHINESE_COMPO_ROOT_DIR, "char_split_table_crawled.txt")
+CHINESE_SPLIT_TABLE          = os.path.join(CHINESE_COMPO_ROOT_DIR, "chinese_split_table.txt")
+SIMILAR_COMPONENTS_FILE      = os.path.join(CHINESE_COMPO_ROOT_DIR, "similar_components.txt")
+CHINESE_SPLIT_TABLE_REPLACED = os.path.join(CHINESE_COMPO_ROOT_DIR, "chinese_split_table_replaced.txt")
+COMPONENTS_SUMMARY_FILE      = os.path.join(CHINESE_COMPO_ROOT_DIR, "chinese_compo_summary.txt")
+CHINESE_STRUCTURES           = {'⿱', '⿰', '⿳', '⿲', '⿸', '⿹', '⿺', '⿶', '⿵', '⿷', '⿴', '⿻'}
 
 
 def missing_chars_in_split_table():

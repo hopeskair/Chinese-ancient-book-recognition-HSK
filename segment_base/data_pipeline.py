@@ -99,7 +99,7 @@ def imgs_augmentation_tf(img_tensors):
     
     # augment images, 这些方法对uint8, float32类型均有效
     img_tensors = tf.image.random_brightness(img_tensors, max_delta=0.5)
-    img_tensors = tf.image.random_contrast(img_tensors, lower=0.3, upper=1.)
+    img_tensors = tf.image.random_contrast(img_tensors, lower=0.5, upper=1.)
     img_tensors = tf.image.random_hue(img_tensors, max_delta=0.5)
     img_tensors = tf.image.random_saturation(img_tensors, lower=0., upper=2)
     return img_tensors

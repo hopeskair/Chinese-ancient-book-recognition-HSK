@@ -28,10 +28,10 @@ def get_callbacks(model_struc="densenet"):
         save_best_only=True,
         save_weights_only=True)
     
-    lr_reducer = ReduceLROnPlateau(monitor='val_loss',
-                                   factor=0.6,
+    lr_reducer = ReduceLROnPlateau(monitor='loss',
+                                   factor=0.5,
+                                   patience=10,  # num of epochs
                                    cooldown=0,
-                                   patience=4,  # num of epochs
                                    min_lr=0)
     
     check_or_makedirs(CHAR_RECOG_LOGS_DIR)

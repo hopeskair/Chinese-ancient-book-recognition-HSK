@@ -13,22 +13,26 @@ from util import NUM_CHARS_TASK2 as NUM_CHARS
 from util import NUM_COMPO
 from config import CHAR_IMG_SIZE
 from config import CHAR_RECOG_CKPT_DIR, CHAR_RECOG_LOGS_DIR
+from config import CHAR_IMAGE_PATHS_FILE, CHAR_TFRECORDS_PATHS_FILE
 
 
-def main(data_file, src_type, epochs, init_epochs=0, model_struc="densenet", weights_path=""):
+def train(data_file, src_type, epochs, init_epochs=0, model_struc="densenet", weights_path=""):
     tf_config()
     K.set_learning_phase(True)
     
     # 加载模型
     train_model = work_net(NUM_CHARS, NUM_COMPO, stage="train", img_size=CHAR_IMG_SIZE, model_struc=model_struc)
-    compile(train_model, loss_names=['chinese_cls_loss', 'chinese_compo_loss'])
+    compile(train_model, loss_names=['chinese_class_loss', 'chinese_compo_loss'])
     
     # 增加度量汇总
     summary_metrics = train_model.get_layer('summary_fn').output
     add_metrics(train_model,
                 metric_name_list=['class_acc', 'top3_cls_acc', 'top5_cls_acc',
-                                  'compo_hit1_ratio', 'compo_hit_acc', 'com_pred1_acc', 'com_pred2_acc'],
-                metric_val_list=summary_metrics[:7])
+                                  'compo_acc', 'compo_pos_acc', 'compo_neg_acc',
+                                  # 'compo_acc_adj', 'compo_pos_acc_adj', 'compo_neg_acc_adj',
+                                  'compo_hit0_ratio', 'compo_hit1_ratio', 'compo_hitn_ratio',
+                                  'compo_hit_acc', 'com_pred1_acc', 'com_pred2_acc', 'com_pred3_acc'],
+                metric_val_list=summary_metrics)
     train_model.summary()
     
     # for layer in train_model.layers:
@@ -57,4 +61,15 @@ def main(data_file, src_type, epochs, init_epochs=0, model_struc="densenet", wei
     # 保存模型
     train_model.save_weights(os.path.join(CHAR_RECOG_CKPT_DIR, "char_recog_with_components_" + model_struc + "_finished.h5"))
     
+
+def main():
+    train(data_file=CHAR_TFRECORDS_PATHS_FILE,
+          src_type="tfrecords",
+          epochs=1000,
+          init_epochs=0,
+          model_struc="densenet",
+          weights_path="")
+
+
+if __name__ == "__main__":
     print("Done !")

@@ -42,7 +42,7 @@ def generate_all_chinese_images_bigger(font_file, image_size=int(CHAR_IMG_SIZE*1
 def generate_chinese_images_to_check(obj_size=CHAR_IMG_SIZE, augmentation=False):
     print("Get font_file_list ...")
     font_file_list = [os.path.join(FONT_FILE_DIR, font_name) for font_name in os.listdir(FONT_FILE_DIR)
-                      if font_name.lower()[-4:] in (".otf", ".ttf", ".ttc")]
+                      if font_name.lower()[-4:] in (".otf", ".ttf", ".ttc", ".fon")]
     # font_file_list = [os.path.join(FONT_FINISHED_DIR, "chinese_fonts_暂时移出/康熙字典体完整版本.otf")]
     
     chinese_char_num = len(CHAR2ID_DICT)
@@ -83,8 +83,8 @@ def generate_chinese_images_to_check(obj_size=CHAR_IMG_SIZE, augmentation=False)
 def generate_chinese_images(obj_size=CHAR_IMG_SIZE, num_imgs_per_font=NUM_IMAGES_PER_FONT):
     print("Get font_file_list ...")
     font_file_list = [os.path.join(FONT_FILE_DIR, font_name) for font_name in os.listdir(FONT_FILE_DIR)
-                      if font_name.lower()[-4:] in (".otf", ".ttf", ".ttc")]
-
+                      if font_name.lower()[-4:] in (".otf", ".ttf", ".ttc", ".fon")]
+    
     print("Begin to generate images ...")
     chinese_char_num = len(CHAR2ID_DICT)
     total_num = len(font_file_list) * chinese_char_num
@@ -123,7 +123,7 @@ def generate_chinese_images(obj_size=CHAR_IMG_SIZE, num_imgs_per_font=NUM_IMAGES
 def generate_tfrecords(obj_size=CHAR_IMG_SIZE, num_imgs_per_font=NUM_IMAGES_PER_FONT):
     print("Get font_file_list ...")
     font_file_list = [os.path.join(FONT_FILE_DIR, font_name) for font_name in os.listdir(FONT_FILE_DIR)
-                      if font_name.lower()[-4:] in (".otf", ".ttf", ".ttc")]
+                      if font_name.lower()[-4:] in (".otf", ".ttf", ".ttc", ".fon")]
     
     # 创建保存tfrecords文件的目录
     check_or_makedirs(CHAR_TFRECORDS_DIR)
@@ -386,7 +386,7 @@ def display_tfrecords(tfrecords_file):
 
 
 if __name__ == '__main__':
-    # generate_chinese_images_to_check(obj_size=CHAR_IMG_SIZE, augmentation=False)
+    generate_chinese_images_to_check(obj_size=48, augmentation=False)
     # generate_chinese_images(num_imgs_per_font=3)
     # generate_tfrecords(num_imgs_per_font=NUM_IMAGES_PER_FONT)
     #

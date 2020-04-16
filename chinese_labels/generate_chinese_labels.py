@@ -9,8 +9,8 @@ def generate_labels(label_file, chars_file_list):
     label_file_path = os.path.join(CURR_DIR, label_file)
     chars_file_paths = [os.path.join(CURR_DIR, chars_file) for chars_file in chars_file_list]
 
-    # In tf.nn.ctc_loss, default blank label is 0. Here use "*" as blank.
-    id2char_dict = {0: "*"}
+    # In tf.nn.ctc_loss, default blank label is 0. Here use "_" as blank.
+    id2char_dict = {0: "_"}
     if os.path.exists(label_file_path):
         with open(label_file_path, "r", encoding="utf-8") as fr:
             for line in fr:
@@ -67,6 +67,10 @@ def generate_chinese_labels_mixed_common():
 def generate_chinese_labels_mixed_all():
     generate_labels(label_file="chinese_labels_mixed_all.txt",
                     chars_file_list=["chars_GB2312_both_levels_6763.txt", "chars_Big5_all_traditional_13053.txt"])
+    
+def generate_chinese_labels_all():
+    generate_labels(label_file="chinese_labels_all.txt",
+                    chars_file_list=["chars_Unicode_all_chinese_20902.txt"])
 
 
 if __name__ == '__main__':
@@ -76,5 +80,6 @@ if __name__ == '__main__':
     # generate_chinese_labels_traditional_all()
     # generate_chinese_labels_mixed_common()
     # generate_chinese_labels_mixed_all()
+    generate_chinese_labels_all()
     
     print("Done !")

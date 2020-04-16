@@ -162,7 +162,7 @@ def adjust_img_and_splite_boxes_tf(image, boxes, cls_id,
     # augment image
     image = tf.cast(image, tf.uint8)
     image = tf.image.random_brightness(image, max_delta=0.5)
-    image = tf.image.random_contrast(image, lower=0.3, upper=1.)
+    image = tf.image.random_contrast(image, lower=0.5, upper=1.)
     image = tf.image.random_hue(image, max_delta=0.5)
     image = tf.image.random_saturation(image, lower=0.5, upper=90)
     

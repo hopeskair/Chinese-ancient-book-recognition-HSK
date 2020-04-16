@@ -8,9 +8,9 @@ from segment_double_line.train import main as double_line_train
 
 
 if __name__ == '__main__':
-    # book_page_train()
+    book_page_train()
     # mix_line_train()
     # text_line_train()
-    double_line_train()
+    # double_line_train()
     
     print("Done !")

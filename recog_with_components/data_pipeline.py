@@ -126,13 +126,13 @@ def imgs_augmentation_tf(img_tensors):
     
     # augment images, 这些方法对uint8, float32类型均有效
     img_tensors = tf.image.random_brightness(img_tensors, max_delta=0.5)
-    img_tensors = tf.image.random_contrast(img_tensors, lower=0.3, upper=1.)
+    img_tensors = tf.image.random_contrast(img_tensors, lower=0.5, upper=1.)
     img_tensors = tf.image.random_hue(img_tensors, max_delta=0.5)
-    img_tensors = tf.image.random_saturation(img_tensors, lower=0., upper=2)
+    img_tensors = tf.image.random_saturation(img_tensors, lower=0., upper=2.)
     return img_tensors
 
 
-def adjust_img_to_fixed_shape(PIL_img=None, np_img=None, img_shape=(CHAR_IMG_SIZE, CHAR_IMG_SIZE)):
+def adjust_img_to_fixed_shape(PIL_img=None, np_img=None, random_crop=False, fixed_shape=(CHAR_IMG_SIZE, CHAR_IMG_SIZE)):
     if PIL_img is None:
         PIL_img = Image.fromarray(np_img)
     
@@ -140,9 +140,19 @@ def adjust_img_to_fixed_shape(PIL_img=None, np_img=None, img_shape=(CHAR_IMG_SIZ
     if PIL_img.mode != "RGB":
         PIL_img = PIL_img.convert("RGB")
     
+    # random crop image
+    if random_crop:
+        raw_w, raw_h = PIL_img.size
+        crop_w, crop_h = np.random.uniform(0.88, 1.0, size=[2])
+        left, upper = np.random.uniform(0.0, 0.12, size=[2])
+        right, lower = 1 - (1 - crop_w - left),  1 - (1 - crop_h - upper)
+        crop_box = np.array([left, upper, right, lower]) * np.array([raw_w, raw_h, raw_w, raw_h])
+        crop_box = crop_box.astype(np.int32)
+        PIL_img = PIL_img.crop(crop_box)
+    
     # resize
     raw_w, raw_h = PIL_img.size
-    obj_h, obj_w = img_shape
+    obj_h, obj_w = fixed_shape
     if raw_w != obj_w or raw_h != obj_h:
         scale_ratio = min(obj_h / raw_h, obj_w / raw_w)
         new_w, new_h = int(raw_w * scale_ratio), int(raw_h * scale_ratio)
@@ -153,12 +163,12 @@ def adjust_img_to_fixed_shape(PIL_img=None, np_img=None, img_shape=(CHAR_IMG_SIZ
     return PIL_img
 
 
-def get_img_then_augment(annotation_line, img_shape):
+def get_img_then_augment(annotation_line, fixed_shape):
     img_path = annotation_line.split("\t")[0]
     chinese_char = os.path.basename(img_path)[0]
     
     PIL_img = Image.open(img_path)
-    PIL_img = adjust_img_to_fixed_shape(PIL_img, img_shape)
+    PIL_img = adjust_img_to_fixed_shape(PIL_img, fixed_shape)
     np_img = np.array(PIL_img, dtype=np.uint8)
     
     np_img = imgs_augmentation(np_img=np_img)  # image augmentation
@@ -167,7 +177,7 @@ def get_img_then_augment(annotation_line, img_shape):
 
 
 @threadsafe_generator
-def data_generator_with_images(annotation_lines, batch_size, img_shape):
+def data_generator_with_images(annotation_lines, batch_size, fixed_shape):
     n = len(annotation_lines)
     i = 0
     while True:
@@ -178,8 +188,8 @@ def data_generator_with_images(annotation_lines, batch_size, img_shape):
             if i == 0: np.random.shuffle(annotation_lines)
             i = (i + 1) % n
             
-            np_img, chinese_char = get_img_then_augment(annotation_lines[i], img_shape)
-            char_id = CHAR2ID_DICT(chinese_char)
+            np_img, chinese_char = get_img_then_augment(annotation_lines[i], fixed_shape)
+            char_id = CHAR2ID_DICT[chinese_char]
             
             images_list.append(np_img)
             char_ids_list.append(char_id)
@@ -196,10 +206,40 @@ def data_generator_with_images(annotation_lines, batch_size, img_shape):
                        "compo_embeddings": compo_embeddings}
         
         yield inputs_dict
-        
 
-def look_up_dict_py(char_utf8_np):
-    char_utf8 = char_utf8_np.tolist()   # scalar
+
+def adjust_images_then_augment_tf(img_tensor, fixed_shape):
+    # to rgb
+    img_tensor = tf.image.grayscale_to_rgb(img_tensor)
+    
+    # random crop image
+    raw_shape = tf.cast(tf.shape(img_tensor)[:2], tf.float32)
+    raw_h, raw_w = raw_shape[0], raw_shape[1]
+    crop_h = tf.cast(raw_h * tf.random.uniform([], 0.88, 1.), tf.int32)
+    crop_w = tf.cast(raw_w * tf.random.uniform([], 0.88, 1.), tf.int32)
+    img_tensor = tf.image.random_crop(img_tensor, size=[crop_h, crop_w, 3])
+    
+    # scale image to fixed size
+    raw_shape = tf.cast(tf.shape(img_tensor)[:2], tf.float32)
+    obj_shape = tf.cast(fixed_shape, tf.float32)
+    scale_ratio = tf.reduce_min(obj_shape / raw_shape)
+    new_shape = tf.cast(raw_shape * scale_ratio, tf.int32)
+    img_tensor = tf.image.resize(img_tensor, size=new_shape)  # float32
+    img_tensor = tf.cast(img_tensor, dtype=tf.uint8)
+    
+    delta_h, delta_w = fixed_shape[0] - new_shape[0], fixed_shape[1] - new_shape[1]
+    h1, w1 = delta_h // 2, delta_w // 2
+    h2, w2 = delta_h - h1, delta_w - w1
+    img_tensor = tf.pad(img_tensor, [[h1, h2], [w1, w2], [0, 0]], mode="CONSTANT", constant_values=255)
+    
+    # image augmentation
+    img_tensor = imgs_augmentation_tf(img_tensor)
+    
+    return img_tensor
+
+
+def look_up_dict_py(char_utf8):
+    # char_utf8 = char_utf8.tolist()   # scalar
     chinese_char = char_utf8.decode("utf-8")
     
     char_id = CHAR2ID_DICT[chinese_char]
@@ -212,7 +252,7 @@ def look_up_dict_py(char_utf8_np):
     return char_id, compo_embedding
     
 
-def data_generator_with_tfrecords(tfrecords_files, batch_size, img_shape):
+def data_generator_with_tfrecords(tfrecords_files, batch_size, fixed_shape):
     data_set = tf.data.TFRecordDataset(tfrecords_files).repeat()
     
     def parse_fn(serialized_example):
@@ -229,39 +269,35 @@ def data_generator_with_tfrecords(tfrecords_files, batch_size, img_shape):
         img_w = features['img_width']
         image_raw = tf.io.decode_raw(features["bytes_image"], tf.uint8)
         img_tensor = tf.reshape(image_raw, shape=[img_h, img_w, 1])
-
-        # to rgb
-        img_tensor = tf.image.grayscale_to_rgb(img_tensor)
-
-        # scale image to fixed size
-        raw_shape = tf.cast([img_h, img_w], tf.float32)
-        obj_shape = tf.cast(img_shape, tf.float32)
-        scale_ratio = tf.reduce_min(obj_shape / raw_shape)
-        new_shape = tf.cast(obj_shape * scale_ratio, tf.int32)
-        img_tensor = tf.image.resize(img_tensor, size=new_shape)  # float32
-        img_tensor = tf.cast(img_tensor, dtype=tf.uint8)
-        
-        delta_h, delta_w = img_shape[0] - new_shape[0], img_shape[1] - new_shape[1]
-        h1, w1 = delta_h // 2, delta_w // 2
-        h2, w2 = delta_h - h1, delta_w - w1
-        img_tensor = tf.pad(img_tensor, [[h1,h2], [w1,w2], [0,0]], mode="CONSTANT", constant_values=255)
-        img_tensor = imgs_augmentation_tf(img_tensor)
+        img_tensor = adjust_images_then_augment_tf(img_tensor, fixed_shape)
         img_tensor = tf.cast(img_tensor, tf.float32)
         
         # chinese char id
         char_utf8_tf = features['bytes_char']
-        chinese_char_id, compo_embedding = tf.numpy_function(look_up_dict_py, inp=char_utf8_tf, dout=[tf.int32, tf.int8])
-        
-        return {"batch_images": img_tensor, "chinese_char_ids": chinese_char_id, "compo_embeddings": compo_embedding}
+        chinese_char_id, compo_embedding = tf.numpy_function(look_up_dict_py, inp=[char_utf8_tf,], Tout=[tf.int32, tf.int8])
+        return img_tensor, chinese_char_id, compo_embedding
     
-    data_set = data_set.map(parse_fn, tf.data.experimental.AUTOTUNE).shuffle(2048).batch(batch_size).prefetch(200)
+    def set_dataset_outputs(batch_images, chinese_char_ids, compo_embeddings):
+        # Using set_shape() to avoid errors caused by Keras failing to infer the shape of outputs.
+        batch_images.set_shape([batch_size, *fixed_shape, 3])
+        chinese_char_ids.set_shape([batch_size])
+        compo_embeddings.set_shape([batch_size, NUM_COMPO])
+        return {"batch_images": batch_images, "chinese_char_ids": chinese_char_ids, "compo_embeddings": compo_embeddings}
+
+    data_set = (data_set
+                .map(parse_fn, tf.data.experimental.AUTOTUNE)
+                .shuffle(2048)
+                .batch(batch_size)
+                .map(set_dataset_outputs)
+                .prefetch(200)
+    )
     
     return data_set
 
 
 def data_generator(data_file, src_type="images", validation_split=0.1):
     """data generator for fit_generator"""
-    img_shape, batch_size = (CHAR_IMG_SIZE, CHAR_IMG_SIZE), CHAR_RECOG_BATCH_SIZE
+    fixed_shape, batch_size = (CHAR_IMG_SIZE, CHAR_IMG_SIZE), CHAR_RECOG_BATCH_SIZE
     
     with open(data_file, "r", encoding="utf8") as fr:
         lines = [line.strip() for line in fr.readlines()]
@@ -271,11 +307,11 @@ def data_generator(data_file, src_type="images", validation_split=0.1):
     np.random.shuffle(train_lines)
     
     if src_type == "images":
-        training_generator = data_generator_with_images(train_lines, batch_size, img_shape)
-        validation_generator = data_generator_with_images(validation_lines, batch_size, img_shape)
+        training_generator = data_generator_with_images(train_lines, batch_size, fixed_shape)
+        validation_generator = data_generator_with_images(validation_lines, batch_size, fixed_shape)
     elif src_type == "tfrecords":
-        training_generator = data_generator_with_tfrecords(train_lines, batch_size, img_shape)
-        validation_generator = data_generator_with_tfrecords(validation_lines, batch_size, img_shape)
+        training_generator = data_generator_with_tfrecords(train_lines, batch_size, fixed_shape)
+        validation_generator = data_generator_with_tfrecords(validation_lines, batch_size, fixed_shape)
     else:
         ValueError("Optional src type: 'images', 'tfrecords'.")
     

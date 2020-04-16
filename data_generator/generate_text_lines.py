@@ -702,7 +702,7 @@ def chinese_char_img_generator_using_font(img_size=64):
 
     print("Get font_file_list ...")
     font_file_list = [os.path.join(FONT_FILE_DIR, font_name) for font_name in os.listdir(FONT_FILE_DIR)
-                      if font_name.lower()[-4:] in (".otf", ".ttf", ".ttc")]
+                      if font_name.lower()[-4:] in (".otf", ".ttf", ".ttc", ".fon")]
 
     PIL_images_list = []
     while True:
