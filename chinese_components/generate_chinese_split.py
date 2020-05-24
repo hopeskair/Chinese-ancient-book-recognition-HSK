@@ -2,68 +2,114 @@
 # Author: hushukai
 
 import os
+import re
 import numpy as np
 
-from chinese_components.crawler import get_char_split_info
+from chinese_components.convert_chinese_number import convert_chinese_number
 
 from config import CHINESE_COMPO_ROOT_DIR
 
-
-CHINESE_COMPONENTS_FILE      = os.path.join(CHINESE_COMPO_ROOT_DIR, "char_split_table_normal.txt")
-MISSING_CHARS_FILE           = os.path.join(CHINESE_COMPO_ROOT_DIR, "missing_chars_in_split_table.txt")
-CHINESE_COMPONENTS_CRAWLED   = os.path.join(CHINESE_COMPO_ROOT_DIR, "char_split_table_crawled.txt")
-CHINESE_SPLIT_TABLE          = os.path.join(CHINESE_COMPO_ROOT_DIR, "chinese_split_table.txt")
+CHINESE_STROKES_RAW_FILE     = os.path.join(CHINESE_COMPO_ROOT_DIR, "CJK统一汉字表(按笔画数排序).txt")
+CHINESE_STROKES_FILE         = os.path.join(CHINESE_COMPO_ROOT_DIR, "chinese_strokes_num.txt")
+CHINESE_SPLIT_RAW_FILE       = os.path.join(CHINESE_COMPO_ROOT_DIR, "IDS-UCS-Basic.txt")
+CHINESE_SPLIT_FILE           = os.path.join(CHINESE_COMPO_ROOT_DIR, "chinese_split_basic.txt")
 SIMILAR_COMPONENTS_FILE      = os.path.join(CHINESE_COMPO_ROOT_DIR, "similar_components.txt")
 CHINESE_SPLIT_TABLE_REPLACED = os.path.join(CHINESE_COMPO_ROOT_DIR, "chinese_split_table_replaced.txt")
 COMPONENTS_SUMMARY_FILE      = os.path.join(CHINESE_COMPO_ROOT_DIR, "chinese_compo_summary.txt")
 CHINESE_STRUCTURES           = {'⿱', '⿰', '⿳', '⿲', '⿸', '⿹', '⿺', '⿶', '⿵', '⿷', '⿴', '⿻'}
 
 
-def missing_chars_in_split_table():
-    chinese_split_set = set()
-    with open(CHINESE_COMPONENTS_FILE, "r", encoding="utf-8") as fr:
+def process_chinese_strokes():
+    strokes_dict = {}
+    with open(CHINESE_STROKES_RAW_FILE, "r", encoding="utf8") as fr:
+        curr_strokes_num = None
         for line in fr:
-            _, u_code, _, components = line.strip().split("\t")[:4]
-            u_code = int(u_code, base=16)
-            chinese_split_set.add(u_code)
-
-    missing_unicodes = []
-    for i in range(0x4E00, 0x9FA5 + 1):
-        if i not in chinese_split_set:
-            print(i, chr(i))
-            missing_unicodes.append(hex(i)[2:])
-            
-    with open(MISSING_CHARS_FILE, "w", encoding="utf-8") as fw:
-        fw.write("\n".join(missing_unicodes))
-
-
-def crawle_missing_split_info():
-    with open(MISSING_CHARS_FILE, "r", encoding="utf-8") as fr:
-        lines = fr.readlines()
-    unicodes = [int(line.strip(), base=16) for line in lines]
-    get_char_split_info(unicode_list=unicodes)
+            m = re.search(pattern=r"【(?P<strokes_num>.*?)画】", string=line)
+            if m:
+                curr_strokes_num = convert_chinese_number(chinese_str=m.group("strokes_num"))
+                strokes_dict[curr_strokes_num] = ""
+                continue
+            if curr_strokes_num:
+                chinese_chars = line.strip()[3:]
+                strokes_dict[curr_strokes_num] += chinese_chars
+    
+    with open(CHINESE_STROKES_FILE, "w", encoding="utf8") as fw:
+        for strokes_num, chinese_chars in strokes_dict.items():
+            fw.write(str(strokes_num) + "\t" + chinese_chars + "\n")
 
 
-def combine_split_table():
+def summarize_split_info():
     chinese_split_dict = {}
-    with open(CHINESE_COMPONENTS_FILE, "r", encoding="utf-8") as fr:
+    with open(CHINESE_SPLIT_RAW_FILE, "r", encoding="utf-8") as fr:
         for line in fr:
-            _, u_code, _, components = line.strip().split("\t")[:4]
-            u_code = int(u_code, base=16)
-            chinese_split_dict.update({u_code: components})
+            _, chinese_char, split_info = line.strip().split()[:3]
+            chinese_split_dict[chinese_char] = split_info
     
-    with open(CHINESE_COMPONENTS_CRAWLED, "r", encoding="utf-8") as fr:
+    chinese_strokes_dict = {}
+    with open(CHINESE_STROKES_FILE, "r", encoding="utf8") as fr:
         for line in fr:
-            u_code, _, components = line.strip().split("\t")[:3]
-            u_code = int(u_code, base=16)
-            chinese_split_dict.update({u_code: components})
+            strokes_num, chinese_chars = line.strip().split()[:2]
+            for char in chinese_chars:
+                chinese_strokes_dict[char] = int(strokes_num)
     
-    with open(CHINESE_SPLIT_TABLE, "w", encoding="utf-8") as fw:
-        for u_code in range(0x4E00, 0x9FA5 + 1):
-            assert u_code in chinese_split_dict
-            chinese_char = chr(u_code)
-            line_str = hex(u_code).upper()[2:] + "\t" + chinese_char + "\t" + chinese_split_dict[u_code] + "\n"
-            fw.write(line_str)
+    assert len(chinese_split_dict) == 20902 and len(chinese_strokes_dict) == 20902
+
+    start, end = 0x4e00, 0x9fa5
+    with open(CHINESE_SPLIT_FILE, "w", encoding="utf8") as fw:
+        for i in range(start, end+1):
+            chinese_char = chr(i)
+            label = str(i - start)
+            u_code = hex(i).upper()[2:]
+            assert chinese_char in chinese_split_dict and chinese_char in chinese_strokes_dict
+            strokes_num = str(chinese_strokes_dict[chinese_char])
+            split_info = chinese_split_dict[chinese_char]
+            fw.write(label + "\t" + u_code + "\t" + chinese_char + "\t" + strokes_num + "\t" + split_info + "\n")
+
+
+def get_sub_compo(c, chinese_split_dict):
+    if c not in chinese_split_dict or chinese_split_dict[c] == [c]:
+        return [c]
+    else:
+        components = chinese_split_dict[c]
+        sub_compo = []
+        [sub_compo.extend(get_sub_compo(c, chinese_split_dict)) for c in components]
+        return sub_compo
+
+
+def define_chinese_components():
+    chinese_split_dict = {}
+    chinese_strokes_dict = {}
+    with open(CHINESE_SPLIT_FILE, "r", encoding="utf-8") as fr:
+        pattern = re.compile(r"&.*?;|.")
+        for line in fr:
+            _, u_code, chinese_char, strokes_num, split_info = line.strip().split()[:5]
+            # u_code = int(u_code, base=16)
+            components = re.findall(pattern, split_info)
+            chinese_split_dict[chinese_char] = components
+            chinese_strokes_dict[chinese_char] = int(strokes_num)
+    
+    real_split_dict = {}
+    for chinese_char in chinese_split_dict.keys():
+        real_split_dict[chinese_char] = get_sub_compo(chinese_char, chinese_split_dict)
+        # print(chinese_char, ":", real_split_dict[chinese_char])
+    
+    components_set = set()
+    [components_set.update(components) for components in real_split_dict.values()]
+    components_set = list(components_set)
+    components_set.sort()
+    print(len(components_set), components_set)
+    
+    compo_chinese_dict = {}
+    for chinese_char, components in real_split_dict.items():
+        for compo in components:
+            if compo not in compo_chinese_dict:
+                compo_chinese_dict[compo] = set(chinese_char)
+            else:
+                compo_chinese_dict[compo].add(chinese_char)
+
+    for compo in components_set:
+        char_set = compo_chinese_dict[compo]
+        print(compo, ":", len(char_set), char_set)
 
 
 def replace_similar_components():
@@ -198,11 +244,11 @@ def chinese_components_recognition_dicts():
 
 
 if __name__ == '__main__':
-    # missing_chars_in_split_table()
-    # crawle_missing_split_info()
-    # combine_split_table()
+    # process_chinese_strokes()
+    # summarize_split_info()
+    define_chinese_components()
     # replace_similar_components()
     # encode_components()
-    chinese_components_recognition_dicts()
+    # chinese_components_recognition_dicts()
     
     print("Done !")
