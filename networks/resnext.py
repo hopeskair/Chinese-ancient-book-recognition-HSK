@@ -164,14 +164,14 @@ def ReNext40_segment_double_line(inputs, feat_stride=16, scope="resnext"):
     return outputs
 
 
-def ResNeXt58_for_char_recog(inputs, scope="resnext"):
+def ResNeXt58_for_char_recog(inputs, feat_stride=8, scope="resnext"):
     def stack_fn(x):
         x = stack3(x, 128, 3, name='conv2')
-        x = stack3(x, 256, 8, name='conv3')  # 1/8 size
-        x = stack3(x, 512, 8, name='conv4')  # 1/16 size
+        x = stack3(x, 256, 8, name='conv3')                         # 1/8 size
+        x = stack3(x, 512, 8, stride1=feat_stride//8, name='conv4') # 1/8 or 1/16
         return x
     
     with backend.name_scope(scope):
-        outputs = ResNet(inputs, stack_fn, use_bias=True, block_preact=False)  # 1/16 size
+        outputs = ResNet(inputs, stack_fn, use_bias=True, block_preact=False)  # 1/8 size
     
     return outputs

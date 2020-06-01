@@ -9,11 +9,10 @@ from tensorflow.keras import backend as K
 from .model import work_net
 from .data_pipeline import adjust_img_to_fixed_shape
 
-from util import NUM_COMPO
-from util import NUM_CHARS_TASK2 as NUM_CHARS
-from util import ID2CHAR_DICT_TASK2 as ID2CHAR_DICT
 from config import CHAR_IMG_SIZE
 from config import CHAR_RECOG_CKPT_DIR
+from config import ID_TO_CHAR_STRUC
+from util import COMPO_SEQ_TO_CHAR
 
 
 def load_images(img_path):
@@ -27,18 +26,18 @@ def load_images(img_path):
         yield PIL_img, os.path.basename(img_path)
 
 
-def main(img_path, model_struc="densenet", weights_path=""):
+def main(img_path, model_struc="densenet_gru", weights_path=""):
     K.set_learning_phase(False)
     
     if not os.path.exists(weights_path):
-        weights_path = os.path.join(CHAR_RECOG_CKPT_DIR, "char_recog_with_components_" + model_struc + "_finished.h5")
+        weights_path = os.path.join(CHAR_RECOG_CKPT_DIR, "char_recog_with_compo_" + model_struc + "_finished.h5")
         assert os.path.exists(weights_path)
     
     # 加载模型
-    pred_model = work_net(NUM_CHARS, NUM_COMPO, stage="predict", img_size=CHAR_IMG_SIZE, model_struc=model_struc)
+    pred_model = work_net(stage="predict", img_size=CHAR_IMG_SIZE, model_struc=model_struc)
     pred_model.load_weights(weights_path, by_name=True)
     print("\nLoad model weights from %s\n" % weights_path)
-    # ctpn_model.summary()
+    # pred_model.summary()
     
     count = 0
     for PIL_img, img_name in load_images(img_path):
@@ -48,13 +47,28 @@ def main(img_path, model_struc="densenet", weights_path=""):
         PIL_img = adjust_img_to_fixed_shape(PIL_img=PIL_img, img_shape=(CHAR_IMG_SIZE, CHAR_IMG_SIZE))
         np_img = np.array(PIL_img, dtype=np.uint8)
         batch_images = np_img[np.newaxis, :, :, :]
-
-        # 模型预测
-        class_indices, _, compo_hit_indices, _, combined_pred1, combined_pred2 = pred_model.predict(x=batch_images)
-        pred_indices = [class_indices[0, 0], compo_hit_indices[0, 0], combined_pred1[0], combined_pred2[0]]
-        pred_chars = [ID2CHAR_DICT[pred_index] for pred_index in pred_indices]
         
-        print("Target {}: cls_pred {}, compo_pred {}, comb_pred1 {}, comb_pred2 {}".format(chinese_char, *pred_chars))
+        # 模型预测
+        pred_char_struc, pred_results = pred_model.predict(x=batch_images)
+        
+        topk = min(5, np.shape(pred_results)[1])
+        pred_chars_topk = ""
+        for j in range(topk):
+            compo_seq = pred_results[0, j]
+            if pred_char_struc[0] == 0:
+                compo_info = "s" + str(compo_seq[0])    # simple char
+            else:
+                zero_indices = np.where(compo_seq == 0)[0]
+                first_zero_pos = zero_indices[0] if zero_indices.size > 0 else compo_seq.size
+                compo_str_seq = [str(compo_id) for compo_id in compo_seq[:first_zero_pos]]
+                
+                if pred_char_struc[0] == 1:
+                    compo_info = "⿰" + ",".join(compo_str_seq)  # left-right char
+                else:
+                    compo_info = "⿱" + ",".join(compo_str_seq)  # upper-lower char
+            pred_chars_topk += COMPO_SEQ_TO_CHAR.get(compo_info, "")
+        
+        print("Target {} - {} Prediction.".format(chinese_char, pred_chars_topk))
         
 
 if __name__ == '__main__':

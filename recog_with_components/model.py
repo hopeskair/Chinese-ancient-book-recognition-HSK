@@ -7,152 +7,242 @@ from tensorflow.keras import layers, models, optimizers, regularizers
 
 from networks.resnet import ResNet58V2_for_char_recog as ResNet_for_char_recog
 from networks.resnext import ResNeXt58_for_char_recog as ResNeXt_for_char_recog
-from networks.densenet import DenseNet60_for_char_recog as DenseNet_for_char_recog
+from networks.densenet import DenseNet35_for_char_recog as DenseNet_for_char_recog
 
 from .data_pipeline import image_preprocess_tf
-from .losses import chinese_class_loss, chinese_compo_loss
+from .losses import char_struc_loss, sc_char_loss, lr_compo_loss, ul_compo_loss
 from .gen_prediction import GeneratePrediction
 
+from util import NUM_CHAR_STRUC, NUM_SIMPLE_CHAR, NUM_LR_COMPO, NUM_UL_COMPO
+from config import CHAR_RECOG_FEAT_STRIDE
 from config import LABEL_SMOOTHING
-from config import COMPO_SCORE_THRESH, COMPO_SCORE_ADJUSTMENT_SCALE
+from config import TOP_K_TO_PRED
 from config import INIT_LEARNING_RATE, CHAE_RECOG_LOSS_WEIGHTS, L2_WEIGHT_DECAY
 from config import SGD_LEARNING_MOMENTUM, SGD_GRADIENT_CLIP_NORM
 
 
-def CNN(inputs, scope="densenet"):
+def CNN(inputs, feat_stride=8, scope="densenet"):
     if scope == "resnet":
-        outputs = ResNet_for_char_recog(inputs, scope)      # 1/16 size
+        outputs = ResNet_for_char_recog(inputs, feat_stride, scope)     # 1/8 size
     elif scope == "resnext":
-        outputs = ResNeXt_for_char_recog(inputs, scope)     # 1/16 size
+        outputs = ResNeXt_for_char_recog(inputs, feat_stride, scope)    # 1/8 size
     elif scope == "densenet":
-        outputs = DenseNet_for_char_recog(inputs, scope)    # 1/16 size
+        outputs = DenseNet_for_char_recog(inputs, feat_stride, scope)   # 1/8 size
     else:
         ValueError("Optional CNN scope: 'resnet', 'resnext', 'densenet'.")
     
     return outputs
 
 
-def build_model(num_chars, num_compo, stage="test", img_size=64, model_struc="densenet"):
+def Bidirectional_RNN(inputs, rnn_units=64, rnn_type="gru"):
+    type_options = ["lstm", "gru"]
+    networks = [layers.LSTM, layers.GRU]
+    
+    i = type_options.index(rnn_type.split("_")[0])
+    rnn_layer = networks[i]
+    
+    with K.name_scope("bidirectional_" + rnn_type):
+        # Based on available runtime hardware, this layer will choose different
+        # implementations (pure-tf or cudnn-based).
+        outputs = layers.Bidirectional(
+            rnn_layer(units=rnn_units, dropout=0.2, return_sequences=True, kernel_initializer='he_normal'),
+            merge_mode="concat")(inputs)
+    
+    return outputs
+
+
+def data_branch_tf(inputs, stage="test"):
+    features, components_seq, real_char_struc, pred_char_struc = inputs
+    
+    char_struc_used = real_char_struc if stage == "train" else pred_char_struc
+    sc_indices = tf.where(char_struc_used == 0)[:, 0]
+    lr_indices = tf.where(char_struc_used == 1)[:, 0]
+    ul_indices = tf.where(char_struc_used == 2)[:, 0]
+    
+    sc_features = tf.gather(features, indices=sc_indices)
+    lr_features = tf.gather(features, indices=lr_indices)
+    ul_features = tf.gather(features, indices=ul_indices)
+    
+    sc_labels = tf.gather(components_seq, indices=sc_indices)[:, 0]
+    lr_compo_seq = tf.gather(components_seq, indices=lr_indices)
+    ul_compo_seq = tf.gather(components_seq, indices=ul_indices)
+    
+    return sc_features, lr_features, ul_features, sc_labels, lr_compo_seq, ul_compo_seq
+
+
+def build_model(stage="test", img_size=64, model_struc="densenet_gru"):
     
     batch_images = layers.Input(shape=[img_size, img_size, 3], name='batch_images')
-    chinese_char_ids = layers.Input(shape=[], dtype=tf.int32, name='chinese_char_ids')
-    compo_embeddings = layers.Input(shape=[num_compo], dtype=tf.int8, name='compo_embeddings')
+    char_struc = layers.Input(shape=[], dtype=tf.int32, name='char_struc')
+    components_seq = layers.Input(shape=[None], dtype=tf.int32, name='components_seq')
     
-    # ******************** Build *********************
+    # ******************* Backbone ********************
     # image normalization
     convert_imgs = layers.Lambda(image_preprocess_tf, arguments={"stage": stage}, name="image_preprocess")(batch_images)
     
-    features = CNN(convert_imgs, scope=model_struc) # 1/16 size
-    feat_size = img_size // 16
+    cnn_type, rnn_type = model_struc.split("_")[:2]
+    features = CNN(convert_imgs, feat_stride=8, scope=cnn_type)    # 1/8 size
+    feat_size = img_size // CHAR_RECOG_FEAT_STRIDE
+
+    # ***************** 汉字结构预测 ******************
+    x_struc = layers.Conv2D(16, 3, strides=2, padding="same", name="struc_conv")(features)  # feat_size//2
+    x_struc = layers.BatchNormalization(axis=3, epsilon=1.001e-5, name="struc_conv_bn")(x_struc)
+    x_struc = layers.Activation('relu', name="struc_conv_relu")(x_struc)
     
-    x = layers.Conv2D(256, (feat_size, feat_size), use_bias=True, name="global_conv")(features)
-    x = layers.BatchNormalization(axis=3, epsilon=1.001e-5, name="global_conv_bn")(x)
-    x = layers.Activation('relu', name="global_conv_relu")(x)
+    pred_struc_logits = layers.Conv2D(NUM_CHAR_STRUC, kernel_size=feat_size//2, name="pred_struc_logits")(x_struc)
+    pred_struc_logits = tf.squeeze(pred_struc_logits, axis=[1, 2], name="pred_struc_squeeze")
     
-    # conv实现fc，汉字预测，汉字部件预测
-    pred_class_logits = layers.Conv2D(num_chars, kernel_size=1, name='fc_class_logits')(x)
-    pred_compo_logits = layers.Conv2D(num_compo, kernel_size=1, name='fc_compo_logits')(x)
+    # ******************* 模型分支 ********************
+    _, pred_char_struc = tf.math.top_k(pred_struc_logits, k=1, name="pred_char_struc")
+    pred_char_struc = pred_char_struc[:, 0]
     
-    pred_class_logits = tf.squeeze(pred_class_logits, axis=[1, 2])
-    pred_compo_logits = tf.squeeze(pred_compo_logits, axis=[1, 2])
+    sc_features, lr_features, ul_features, sc_labels, lr_compo_seq, ul_compo_seq = \
+        layers.Lambda(data_branch_tf, arguments={"stage": stage}, name="data_branch")(
+            [features, components_seq, char_struc, pred_char_struc])
     
-    recog_model = models.Model(inputs=[batch_images, chinese_char_ids, compo_embeddings],
-                               outputs=[pred_class_logits, pred_compo_logits])
+    # ***************** 简单汉字预测 ******************
+    x_sc = layers.Conv2D(16, 3, strdes=2, padding="same", name="sc_conv")(sc_features)  # feat_size//2
+    x_sc = layers.BatchNormalization(axis=3, epsilon=1.001e-5, name="sc_conv_bn")(x_sc)
+    x_sc = layers.Activation('relu', name="sc_conv_relu")(x_sc)
+    
+    pred_sc_logits = layers.Conv2D(NUM_SIMPLE_CHAR, kernel_size=feat_size//2, name='pred_sc_logits')(x_sc)
+    pred_sc_logits = tf.squeeze(pred_sc_logits, axis=[1, 2], name="pred_sc_squeeze")
+    
+    # ************* 左右结构汉字部件预测 ***************
+    x_lr = layers.Conv2D(128, (feat_size, 1), name="lr_conv")(lr_features)
+    x_lr = layers.BatchNormalization(axis=3, epsilon=1.001e-5, name="lr_conv_bn")(x_lr)
+    x_lr = layers.Activation('relu', name="lr_conv_relu")(x_lr)
+    x_lr = tf.squeeze(x_lr, axis=1, name="x_lr_squeeze")
+
+    rnn_units = 128
+    x_lr = Bidirectional_RNN(x_lr, rnn_units=rnn_units//2, rnn_type=rnn_type+"_lr_compo")
+    pred_lr_compo_logits = layers.Dense(NUM_LR_COMPO, name="pred_lr_compo_logits")(x_lr)
+
+    # ************* 上下结构汉字部件预测 ***************
+    ul_features = tf.transpose(ul_features, perm=[0, 2, 1, 3], name="ul_features_transpose")
+    
+    x_ul = layers.Conv2D(128, (feat_size, 1), name="ul_conv")(ul_features)
+    x_ul = layers.BatchNormalization(axis=3, epsilon=1.001e-5, name="ul_conv_bn")(x_ul)
+    x_ul = layers.Activation('relu', name="ul_conv_relu")(x_ul)
+    x_ul = tf.squeeze(x_ul, axis=1, name="x_ul_squeeze")
+    
+    x_ul = Bidirectional_RNN(x_ul, rnn_units=rnn_units//2, rnn_type=rnn_type + "_ul_compo")
+    pred_ul_compo_logits = layers.Dense(NUM_UL_COMPO, name="pred_ul_compo_logits")(x_ul)
+    
+    # ******************** Build *********************
+    recog_model = models.Model(inputs=[batch_images, char_struc, components_seq],
+                               outputs=[pred_struc_logits, pred_char_struc,
+                                        sc_labels, lr_compo_seq, ul_compo_seq,
+                                        pred_sc_logits, pred_lr_compo_logits, pred_ul_compo_logits])
     
     return recog_model
 
 
-def work_net(num_chars, num_compo, stage="test", img_size=64, model_struc="densenet"):
+def work_net(stage="test", img_size=64, model_struc="densenet_gru"):
     
-    recog_model = build_model(num_chars, num_compo, stage, img_size, model_struc)
-
-    batch_images, chinese_char_ids, compo_embeddings = recog_model.inputs
-    pred_class_logits, pred_compo_logits = recog_model.outputs
+    recog_model = build_model(stage, img_size, model_struc)
+    
+    batch_images, char_struc, components_seq = recog_model.inputs
+    pred_struc_logits, pred_char_struc, \
+    sc_labels, lr_compo_seq, ul_compo_seq, \
+    pred_sc_logits, pred_lr_compo_logits, pred_ul_compo_logits = recog_model.outputs
     
     # ******************** Train model **********************
     # 损失函数
     options = {"label_smoothing": LABEL_SMOOTHING}
-    class_loss = layers.Lambda(lambda x: chinese_class_loss(*x, **options),
-                               name='chinese_class_loss')([chinese_char_ids, pred_class_logits])
-    compo_loss = layers.Lambda(lambda x: chinese_compo_loss(*x, **options),
-                               name='chinese_compo_loss')([compo_embeddings, pred_compo_logits])
+    struc_loss = layers.Lambda(lambda x: char_struc_loss(*x, **options),
+                               name='char_struc_loss')([char_struc, pred_struc_logits])
+    sc_loss = layers.Lambda(lambda x: sc_char_loss(*x, **options),
+                            name='sc_char_loss')([sc_labels, pred_sc_logits])
+    lr_loss = layers.Lambda(lambda x: lr_compo_loss(*x, **options),
+                            name='lr_compo_loss')([lr_compo_seq, pred_lr_compo_logits])
+    ul_loss = layers.Lambda(lambda x: ul_compo_loss(*x, **options),
+                            name='ul_compo_loss')([ul_compo_seq, pred_ul_compo_logits])
     
     # ******************** Predict model *********************
-    targets = GeneratePrediction(compo_score_thresh=COMPO_SCORE_THRESH,
-                                 score_adjustment_scale=COMPO_SCORE_ADJUSTMENT_SCALE,
-                                 name="gen_prediction")([pred_class_logits, pred_compo_logits, chinese_char_ids])
+    targets = GeneratePrediction(topk=TOP_K_TO_PRED, stage=stage, name="gen_prediction")(
+        [pred_char_struc, pred_sc_logits, pred_lr_compo_logits, pred_ul_compo_logits])
+    
+    pred_sc_labels, pred_lr_compo_seq, pred_ul_compo_seq, pred_results = targets
     
     # *********************** Summary *************************
-    summary_metrics = layers.Lambda(summary_fn,
-                                    arguments={"compo_score_thresh": COMPO_SCORE_THRESH},
-                                    name="summary_fn")([targets, chinese_char_ids, compo_embeddings])
+    metrics_summary = layers.Lambda(summary_fn, name="summary_fn")(
+        [char_struc, sc_labels, lr_compo_seq, ul_compo_seq,
+         pred_char_struc, pred_sc_labels, pred_lr_compo_seq, pred_ul_compo_seq])
     
     # ********************* Define model **********************
     if stage == 'train':
-        return models.Model(inputs=recog_model.inputs, outputs=[class_loss, compo_loss, summary_metrics])
+        return models.Model(inputs=recog_model.inputs, outputs=[struc_loss, sc_loss, lr_loss, ul_loss, metrics_summary])
     else:
-        return models.Model(inputs=batch_images, outputs=targets)
+        return models.Model(inputs=batch_images, outputs=[pred_char_struc, pred_results])
 
 
-def summary_fn(inputs, compo_score_thresh=0.7):
-    targets, chinese_char_ids, compo_embeddings = inputs
-    class_indices, class_scores, \
-    compo_scores, adjusted_scores, compo_hit_indices, compo_hit_scores, \
-    combined_pred1, combined_pred2, combined_pred3 = targets
+def summary_fn(inputs, **kwargs):
+    real_char_struc, sc_labels, lr_compo_seq, ul_compo_seq, \
+    pred_char_struc, pred_sc_labels, pred_lr_compo_seq, pred_ul_compo_seq = inputs
     
-    class_pred = class_indices[:, 0]
-    class_acc = tf.reduce_mean(tf.cast(class_pred == chinese_char_ids, tf.float32))
+    # char structure prediction
+    char_struc_acc = tf.reduce_mean(tf.cast(pred_char_struc == real_char_struc, tf.float32))
     
-    top3_cls_acc = tf.reduce_mean(tf.cast(tf.reduce_any(chinese_char_ids[:, tf.newaxis] == class_indices[:, :3], axis=1), tf.float32))
-    top5_cls_acc = tf.reduce_mean(tf.cast(tf.reduce_any(chinese_char_ids[:, tf.newaxis] == class_indices[:, :5], axis=1), tf.float32))
+    # sc prediction
+    sc_acc = tf.reduce_mean(tf.cast(pred_sc_labels[:, 0] == sc_labels, tf.float32))
+    sc_top3 = tf.reduce_mean(tf.cast(tf.reduce_any(pred_sc_labels[:, :3] == sc_labels[:, tf.newaxis], axis=1), tf.float32))
+    sc_top5 = tf.reduce_mean(tf.cast(tf.reduce_any(pred_sc_labels[:, :5] == sc_labels[:, tf.newaxis], axis=1), tf.float32))
 
-    # compo score accuracy
-    compo_embeddings = tf.cast(compo_embeddings, tf.float32)
-    compo_pred = tf.where(compo_scores > compo_score_thresh, 1., 0.)
-    compo_pred_eval = tf.cast(compo_pred == compo_embeddings, tf.float32)
-    compo_acc = tf.reduce_mean(compo_pred_eval)
-    compo_pred_eval_pos = tf.where(compo_embeddings == 1., compo_pred_eval, 0.)
-    compo_pos_acc = tf.reduce_sum(compo_pred_eval_pos) / tf.reduce_sum(compo_embeddings)
-    compo_pred_eval_neg = tf.where(compo_embeddings == 0., compo_pred_eval, 0.)
-    compo_neg_acc = tf.reduce_sum(compo_pred_eval_neg) / tf.reduce_sum(1. - compo_embeddings)
-    
-    # adjust compo score accuracy
-    compo_pred_adjusted = tf.where(adjusted_scores > compo_score_thresh, 1., 0.)
-    compo_pred_eval_adjusted = tf.cast(compo_pred_adjusted == compo_embeddings, tf.float32)
-    compo_acc_adjusted = tf.reduce_mean(compo_pred_eval_adjusted)
-    compo_pred_eval_pos_adjusted = tf.where(compo_embeddings == 1., compo_pred_eval_adjusted, 0.)
-    compo_pos_acc_adjusted = tf.reduce_sum(compo_pred_eval_pos_adjusted) / tf.reduce_sum(compo_embeddings)
-    compo_pred_eval_neg_adjusted = tf.where(compo_embeddings == 0., compo_pred_eval_adjusted, 0.)
-    compo_neg_acc_adjusted = tf.reduce_sum(compo_pred_eval_neg_adjusted) / tf.reduce_sum(1. - compo_embeddings)
+    # lr prediction
+    lr_acc = tf.reduce_mean(tf.cast(tf.reduce_all(pred_lr_compo_seq[:, 0] == lr_compo_seq, axis=1), tf.float32))
+    exp_lr_compo_seq = lr_compo_seq[:, tf.newaxis, :]
+    lr_top3 = tf.reduce_mean(tf.cast(tf.reduce_any(tf.reduce_all(pred_lr_compo_seq[:, :3] == exp_lr_compo_seq, axis=2), axis=1), tf.float32))
+    lr_top5 = tf.reduce_mean(tf.cast(tf.reduce_any(tf.reduce_all(pred_lr_compo_seq[:, :5] == exp_lr_compo_seq, axis=2), axis=1), tf.float32))
 
-    num_compo_hit = tf.reduce_sum(tf.cast(compo_hit_indices != -1, tf.int32), axis=1)
-    compo_hit0_ratio = tf.reduce_mean(tf.cast(num_compo_hit == 0, tf.float32))
-    compo_hit1_ratio = tf.reduce_mean(tf.cast(num_compo_hit == 1, tf.float32))
-    compo_hitn_ratio = tf.reduce_mean(tf.cast(num_compo_hit > 1, tf.float32))
-    
-    compo_hit_index = tf.where(num_compo_hit == 1, compo_hit_indices[:, 0], -1)
-    compo_hit_acc = tf.reduce_mean(tf.cast(compo_hit_index == chinese_char_ids, tf.float32))
+    # ul prediction
+    ul_acc = tf.reduce_mean(tf.cast(tf.reduce_all(pred_ul_compo_seq[:, 0] == ul_compo_seq, axis=1), tf.float32))
+    exp_ul_compo_seq = ul_compo_seq[:, tf.newaxis, :]
+    ul_top3 = tf.reduce_mean(tf.cast(tf.reduce_any(tf.reduce_all(pred_ul_compo_seq[:, :3] == exp_ul_compo_seq, axis=2), axis=1), tf.float32))
+    ul_top5 = tf.reduce_mean(tf.cast(tf.reduce_any(tf.reduce_all(pred_ul_compo_seq[:, :5] == exp_ul_compo_seq, axis=2), axis=1), tf.float32))
 
-    com_pred1_acc = tf.reduce_mean(tf.cast(combined_pred1 == chinese_char_ids, tf.float32))
-    com_pred2_acc = tf.reduce_mean(tf.cast(combined_pred2 == chinese_char_ids, tf.float32))
-    com_pred3_acc = tf.reduce_mean(tf.cast(combined_pred3 == chinese_char_ids, tf.float32))
+    # The sequence ends early when 0(EOC) appears
+    # Correct pred_lr_compo_seq
+    # tf.math.top_k: If two elements are equal, the lower-index element appears first.
+    _max_neg_values, pos_indices = tf.math.top_k(-pred_lr_compo_seq, k=1)       # find the first 0(EOC) position
+    min_values = -_max_neg_values
+    seq_len = tf.shape(pred_lr_compo_seq)[2]
+    zero_pos = tf.where(min_values == 0, pos_indices, seq_len)                  # (bsize, topk, 1)
+    seq_pos = tf.range(seq_len, dtype=tf.int32)[tf.newaxis, tf.newaxis, :]      # (1, 1, seq_len)
+    correct_lr_compo_seq = tf.where(seq_pos >= zero_pos, 0, pred_lr_compo_seq)  # (bsize, topk, seq_len)
     
-    return class_acc, top3_cls_acc, top5_cls_acc, \
-           compo_acc, compo_pos_acc, compo_neg_acc, \
-           compo_hit0_ratio, compo_hit1_ratio, compo_hitn_ratio, \
-           compo_hit_acc, com_pred1_acc, com_pred2_acc, com_pred3_acc
-           # compo_acc_adjusted, compo_pos_acc_adjusted, compo_neg_acc_adjusted
+    # Correct pred_ul_compo_seq
+    _max_neg_values, pos_indices = tf.math.top_k(-pred_ul_compo_seq, k=1)       # find the first 0(EOC) position
+    min_values = -_max_neg_values
+    zero_pos = tf.where(min_values == 0, pos_indices, seq_len)                  # (bsize, topk, 1)
+    correct_ul_compo_seq = tf.where(seq_pos >= zero_pos, 0, pred_ul_compo_seq)  # (bsize, topk, seq_len)
+
+    # lr prediction corrected
+    correct_lr_acc = tf.reduce_mean(tf.cast(tf.reduce_all(correct_lr_compo_seq[:, 0] == lr_compo_seq, axis=1), tf.float32))
+    correct_lr_top3 = tf.reduce_mean(tf.cast(tf.reduce_any(tf.reduce_all(correct_lr_compo_seq[:, :3] == exp_lr_compo_seq, axis=2), axis=1), tf.float32))
+    correct_lr_top5 = tf.reduce_mean(tf.cast(tf.reduce_any(tf.reduce_all(correct_lr_compo_seq[:, :5] == exp_lr_compo_seq, axis=2), axis=1), tf.float32))
+    
+    # ul prediction corrected
+    correct_ul_acc = tf.reduce_mean(tf.cast(tf.reduce_all(correct_ul_compo_seq[:, 0] == ul_compo_seq, axis=1), tf.float32))
+    correct_ul_top3 = tf.reduce_mean(tf.cast(tf.reduce_any(tf.reduce_all(correct_ul_compo_seq[:, :3] == exp_ul_compo_seq, axis=2), axis=1), tf.float32))
+    correct_ul_top5 = tf.reduce_mean(tf.cast(tf.reduce_any(tf.reduce_all(correct_ul_compo_seq[:, :5] == exp_ul_compo_seq, axis=2), axis=1), tf.float32))
+
+    return char_struc_acc, sc_acc, sc_top3, sc_top5, \
+           lr_acc, lr_top3, lr_top5, \
+           ul_acc, ul_top3, ul_top5, \
+           correct_lr_acc, correct_lr_top3, correct_lr_top5, \
+           correct_ul_acc, correct_ul_top3, correct_ul_top5
 
 
 def compile(keras_model, loss_names=[]):
     """编译模型，添加损失函数，L2正则化"""
     
     # 优化器
-    optimizer = optimizers.SGD(INIT_LEARNING_RATE, momentum=SGD_LEARNING_MOMENTUM, clipnorm=SGD_GRADIENT_CLIP_NORM)
+    # optimizer = optimizers.SGD(INIT_LEARNING_RATE, momentum=SGD_LEARNING_MOMENTUM, clipnorm=SGD_GRADIENT_CLIP_NORM)
     # optimizer = optimizers.RMSprop(learning_rate=INIT_LEARNING_RATE, rho=0.9)
     # optimizer = optimizers.Adagrad(learning_rate=INIT_LEARNING_RATE)
     # optimizer = optimizers.Adadelta(learning_rate=1., rho=0.95)
-    # optimizer = optimizers.Adam(learning_rate=INIT_LEARNING_RATE, beta_1=0.9, beta_2=0.999, amsgrad=False)
+    optimizer = optimizers.Adam(learning_rate=INIT_LEARNING_RATE, beta_1=0.9, beta_2=0.999, amsgrad=False)
     
     # 添加损失函数，首先清除损失，防止重复计算
     # keras_model._losses = []

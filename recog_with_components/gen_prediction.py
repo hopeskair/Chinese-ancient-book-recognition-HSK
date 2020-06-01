@@ -1,154 +1,112 @@
 # -*- encoding: utf-8 -*-
 # Author: hushukai
 
-import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
-from tensorflow.keras import backend as K
-
-from util import NUM_CHARS_TASK2 as NUM_CHARS
-from util import NUM_COMPO, COMPO_CO_OCCURRENCE_PROB, CID2CHAR_INDICES, ID2COMPO_INDICES
-from util import ID2CHAR_DICT
 
 
-def compo_chinese_mapping_matrix(num_compo=NUM_COMPO, num_chars=NUM_CHARS, cid2char_indices_dict=CID2CHAR_INDICES):
-    compo_chinese_matrix = np.zeros(shape=[num_compo, num_chars], dtype=np.int8)
+def topk_compo_seq(compo_logits, k=10, sorted=True):
+    compo_scores = tf.math.softmax(compo_logits, axis=-1)
+    compo_scores = tf.math.log(compo_scores)
     
-    for cid in range(num_compo):
-        assert cid in cid2char_indices_dict
-        chinese_indices = cid2char_indices_dict[cid]
-        cids = [cid,] * len(chinese_indices)
-        compo_chinese_matrix[cids, chinese_indices] = 1
+    _shape = tf.shape(compo_scores)
+    bsize, seq_len = _shape[0], _shape[1]
     
-    return compo_chinese_matrix
+    topk_seq = tf.zeros((bsize, k, 0), dtype=tf.int32)
+    seq_scores = tf.zeros((bsize, k), dtype=tf.float32)
+    
+    def loop_body(i, _topk_seq, _seq_scores):
+        curr_scores, curr_indices = tf.math.top_k(compo_scores[:, i], k=k, sorted=sorted)
+        
+        _seq_scores = tf.expand_dims(_seq_scores, axis=2)   # (bsize, k, 1)
+        curr_scores = tf.expand_dims(curr_scores, axis=1)   # (bsize, 1, k)
+        _seq_scores += curr_scores                          # (bsize, k, k)
+        _seq_scores = tf.reshape((bsize, k*k))              # (bsize, k*k)
+        new_seq_scores, _topk_indices = tf.math.top_k(_seq_scores, k=k, sorted=sorted)
+        
+        _r, _c = _topk_indices // k, _topk_indices % k
+        _b = tf.range(bsize, dtype=tf.int32)[:, tf.newaxis]
+        _b = tf.tile(_b, multiples=[1, k])
+        _b_r = tf.stack([_b, _r], axis=2)
+        _b_c = tf.stack([_b, _c], axis=2)
+        
+        _pre_seq = tf.gather_nd(_topk_seq, indices=_b_r)
+        _curr_seq = tf.gather_nd(curr_indices, indices=_b_c)[..., tf.newaxis]
+        new_topk_seq = tf.concat([_pre_seq, _curr_seq], axis=2)
+        
+        return i+1, new_topk_seq, new_seq_scores
 
-
-def chinese_compo_mapping_matrix(num_chars=NUM_CHARS, num_compo=NUM_COMPO, id2compo_indices_dict=ID2COMPO_INDICES):
-    chinese_compo_matrix = np.zeros(shape=[num_chars, num_compo], dtype=np.int8)
+    _, topk_seq, seq_scores = tf.while_loop(cond=lambda i, *unused_args: i<seq_len,
+                                            body=loop_body,
+                                            loop_vars=[0, topk_seq, seq_scores])
     
-    for char_id in range(num_chars):
-        assert char_id in id2compo_indices_dict
-        compo_indices = id2compo_indices_dict[char_id]
-        char_ids = [char_id,] * len(compo_indices)
-        chinese_compo_matrix[char_ids, compo_indices] = 1
-    
-    return chinese_compo_matrix
-
-
-def components_to_chinese_char(compo_scores,
-                               compo_co_occurrence_prob,
-                               compo_chinese_matrix,
-                               compo_score_thresh=0.7,
-                               score_adjustment_scale=0.1):
-    # 调整部件得分
-    compo_indices = tf.where(compo_scores > 0.88)[:, 0]
-    
-    confidences = tf.gather(compo_scores, compo_indices)
-    confidences = tf.expand_dims(confidences, axis=-1)
-    co_occurrence_prob = tf.gather(compo_co_occurrence_prob, compo_indices)
-    adjusted_scores = co_occurrence_prob * confidences * score_adjustment_scale
-    adjusted_scores = tf.reduce_sum(adjusted_scores, axis=0)
-    
-    adjusted_scores += compo_scores
-    max_score_compo_index = tf.argmax(adjusted_scores)
-    max_score = compo_scores[max_score_compo_index]
-    
-    # 部件集
-    compo_indices = tf.where(compo_scores > compo_score_thresh)[:, 0]
-    compo_scores = tf.gather(compo_scores, compo_indices)
-    sorted_indices = tf.argsort(compo_scores, direction='DESCENDING')
-    compo_scores = tf.gather(compo_scores, sorted_indices)
-    compo_indices = tf.gather(compo_indices, sorted_indices)
-    num_selected_compo = tf.shape(compo_indices)[0]
-    
-    # 提取包含部件集的汉字
-    hit_chars = compo_chinese_matrix[max_score_compo_index]
-    prev_hit_chars = hit_chars
-    
-    def loop_condition(i, hit_chars, prev_hit_chars_unused):
-        num_hit = tf.reduce_sum(tf.cast(hit_chars, tf.int32))   # tf.int8类型加和后可能溢出
-        return tf.logical_and(i < num_selected_compo, num_hit > 1)
-
-    def loop_body(i, hit_chars, prev_hit_chars_unused):
-        prev_hit_chars = hit_chars
-        compo_index = compo_indices[i]
-        compo_chars = compo_chinese_matrix[compo_index]
-        hit_chars = tf.where(hit_chars + compo_chars == 2, 1, 0)
-        hit_chars = tf.cast(hit_chars, dtype=prev_hit_chars.dtype)
-        return i+1, hit_chars, prev_hit_chars
-
-    i, hit_chars, prev_hit_chars = tf.while_loop(cond=loop_condition,
-                                                 body=loop_body,
-                                                 loop_vars=[1, hit_chars, prev_hit_chars])  # 从1开始
-    
-    num_hit = tf.reduce_sum(tf.cast(hit_chars, tf.int32))
-    i, hit_chars = tf.cond(num_hit == 0, lambda :(i-1, prev_hit_chars), lambda :(i, hit_chars))
-    
-    hit_score = tf.cond(i == 1, lambda :max_score, lambda :tf.reduce_min(compo_scores[:i]))
-    hit_indices = tf.where(hit_chars == 1)[:, 0]
-    hit_indices = tf.cast(hit_indices, tf.int32)
-    
-    num_indices = tf.shape(hit_indices)[0]
-    hit_indices = tf.cond(num_indices >= 10,
-                          lambda :hit_indices[:10],
-                          lambda :tf.pad(hit_indices, [[0, 10-num_indices]], mode='CONSTANT', constant_values=-1))
-    
-    return [adjusted_scores, hit_indices, hit_score]
-
-
-def print_compo_pred_py(chinese_char_id, class_indices, char_indices_pred):
-    print(ID2CHAR_DICT[chinese_char_id], [ID2CHAR_DICT[index] for index in class_indices])
-    print(ID2CHAR_DICT[chinese_char_id], [ID2CHAR_DICT[index] for index in char_indices_pred])
-    return
+    return topk_seq, seq_scores
     
 
 class GeneratePrediction(layers.Layer):
     
-    def __init__(self, compo_score_thresh=0.7, score_adjustment_scale=0.1, **kwargs):
-        self.compo_score_thresh = compo_score_thresh
-        self.score_adjustment_scale = score_adjustment_scale
+    def __init__(self, topk=10, stage="test", **kwargs):
+        self.topk = topk
+        self.stage = stage
         super(GeneratePrediction, self).__init__(**kwargs)
     
     def call(self, inputs, **kwargs):
-        pred_class_logits, pred_compo_logits, chinese_char_ids = inputs
+        pred_char_struc, pred_sc_logits, pred_lr_compo_logits, pred_ul_compo_logits = inputs
         
-        class_scores = tf.math.softmax(pred_class_logits, axis=1)
-        compo_scores = tf.math.sigmoid(pred_compo_logits)
+        # 简单汉字预测
+        _, pred_sc_labels = tf.math.top_k(pred_sc_logits, k=self.topk, sorted=True)
         
-        # 直接预测
-        k = 10
-        class_scores, class_indices = tf.math.top_k(class_scores, k=k, sorted=True)
+        # 左右结构汉字部件预测
+        pred_lr_compo_seq, _ = topk_compo_seq(pred_lr_compo_logits, k=self.topk, sorted=True)
         
-        # 使用部件预测
-        compo_co_occurrence_prob = tf.convert_to_tensor(COMPO_CO_OCCURRENCE_PROB)
-        compo_chinese_matrix = tf.convert_to_tensor(compo_chinese_mapping_matrix())
-        # chinese_compo_matrix = tf.convert_to_tensor(chinese_compo_mapping_matrix())
+        # 上下结构汉字部件预测
+        pred_ul_compo_seq, _ = topk_compo_seq(pred_ul_compo_logits, k=self.topk, sorted=True)
         
-        options = {"compo_co_occurrence_prob": compo_co_occurrence_prob,
-                   "compo_chinese_matrix": compo_chinese_matrix,
-                   # "chinese_compo_matrix": chinese_compo_matrix,
-                   "compo_score_thresh": self.compo_score_thresh,
-                   "score_adjustment_scale": self.score_adjustment_scale}
-        adjusted_scores, compo_hit_indices, compo_hit_scores = \
-            tf.map_fn(fn=lambda x: components_to_chinese_char(x, **options),
-                      elems=compo_scores,
-                      dtype=[tf.float32, tf.int32, tf.float32])
-        
-        num_compo_hit = tf.reduce_sum(tf.cast(compo_hit_indices != -1, tf.int32), axis=1)
-        combined_pred1 = tf.where(num_compo_hit == 1, compo_hit_indices[:, 0], class_indices[:, 0])
-        combined_pred2 = tf.where(tf.logical_and(class_scores[:,0] < 0.85, num_compo_hit == 1), compo_hit_indices[:, 0], class_indices[:, 0])
-        
-        hit_compare = tf.reduce_any(class_indices[:, :, tf.newaxis] == compo_hit_indices[:, tf.newaxis, :], axis=2)
-        hit_compare = tf.cast(hit_compare, tf.int8)
-        _j = tf.argsort(hit_compare, axis=1, direction='DESCENDING', stable=True)[:, 0]
-        _i = tf.range(tf.shape(hit_compare)[0], dtype=_j.dtype)
-        combined_hit_indices = tf.stack([_i, _j], axis=1)
-        combined_pred3 = tf.gather_nd(class_indices, indices=combined_hit_indices)
-        
-        return class_indices, class_scores, \
-               compo_scores, adjusted_scores, compo_hit_indices, compo_hit_scores, \
-               combined_pred1, combined_pred2, combined_pred3
+        # 输出形式
+        if self.stage != "train":
+            batch_size, seq_len = tf.shape(pred_char_struc)[0], tf.shape(pred_lr_compo_seq)[1]
+            
+            pred_sc_batch_indices = tf.where(pred_char_struc == 0)
+            pred_lr_batch_indices = tf.where(pred_char_struc == 1)
+            pred_ul_batch_indices = tf.where(pred_char_struc == 2)
+            
+            sc_num = tf.shape(pred_sc_batch_indices)[0]
+            lr_num = tf.shape(pred_lr_batch_indices)[0]
+            ul_num = tf.shape(pred_ul_batch_indices)[0]
 
-
+            pred_sc_batch_indices = tf.tile(pred_sc_batch_indices, multiples=[1, self.topk])
+            pred_lr_batch_indices = tf.tile(pred_lr_batch_indices, multiples=[1, self.topk])
+            pred_ul_batch_indices = tf.tile(pred_ul_batch_indices, multiples=[1, self.topk])
+            
+            order_indices = tf.range(self.topk, dtype=tf.int32)[tf.newaxis, :]
+            
+            sc_order_indices = tf.tile(order_indices, multiples=[sc_num, 1])
+            lr_order_indices = tf.tile(order_indices, multiples=[lr_num, 1])
+            ul_order_indices = tf.tile(order_indices, multiples=[ul_num, 1])
+            
+            # sc prediction
+            _first_pos = tf.zeros_like(pred_sc_batch_indices, dtype=tf.int32)
+            sc_indices = tf.stack([pred_sc_batch_indices, sc_order_indices, _first_pos], axis=2)
+            pred_results = tf.scatter_nd(indices=sc_indices,
+                                         updates=pred_sc_labels,
+                                         shape=(batch_size, self.topk, seq_len))  # initially zero
+            
+            # lr prediction
+            lr_indices = tf.stack([pred_lr_batch_indices, sc_order_indices], axis=2)
+            pred_results = tf.tensor_scatter_nd_add(tensor=pred_results,
+                                                    indices=lr_indices,
+                                                    updates=pred_lr_compo_seq)
+            
+            # ul prediction
+            ul_indices = tf.stack([pred_ul_batch_indices, ul_order_indices], axis=2)
+            pred_results = tf.tensor_scatter_nd_add(tensor=pred_results,
+                                                    indices=ul_indices,
+                                                    updates=pred_ul_compo_seq)
+        else:
+            pred_results = tf.zeros([], dtype=tf.int32)
+        
+        return pred_sc_labels, pred_lr_compo_seq, pred_ul_compo_seq, pred_results
+        
+        
 if __name__ == '__main__':
     print("Done !")

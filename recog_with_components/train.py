@@ -9,37 +9,35 @@ from .model import work_net, compile, add_metrics
 from .callback import tf_config, get_callbacks
 from .data_pipeline import data_generator
 
-from util import NUM_CHARS_TASK2 as NUM_CHARS
-from util import NUM_COMPO
 from config import CHAR_IMG_SIZE
 from config import CHAR_RECOG_CKPT_DIR, CHAR_RECOG_LOGS_DIR
 from config import CHAR_IMAGE_PATHS_FILE, CHAR_TFRECORDS_PATHS_FILE
 
 
-def train(data_file, src_type, epochs, init_epochs=0, model_struc="densenet", weights_path=""):
+def train(data_file, src_type, epochs, init_epochs=0, model_struc="densenet_gru", weights_path=""):
     tf_config()
     K.set_learning_phase(True)
     
     # 加载模型
-    train_model = work_net(NUM_CHARS, NUM_COMPO, stage="train", img_size=CHAR_IMG_SIZE, model_struc=model_struc)
-    compile(train_model, loss_names=['chinese_class_loss', 'chinese_compo_loss'])
+    train_model = work_net(stage="train", img_size=CHAR_IMG_SIZE, model_struc=model_struc)
+    compile(train_model, loss_names=["char_struc_loss", "sc_char_loss", "lr_compo_loss", "ul_compo_loss"])
     
     # 增加度量汇总
-    summary_metrics = train_model.get_layer('summary_fn').output
+    metrics_summary = train_model.get_layer('summary_fn').output
     add_metrics(train_model,
-                metric_name_list=['class_acc', 'top3_cls_acc', 'top5_cls_acc',
-                                  'compo_acc', 'compo_pos_acc', 'compo_neg_acc',
-                                  # 'compo_acc_adj', 'compo_pos_acc_adj', 'compo_neg_acc_adj',
-                                  'compo_hit0_ratio', 'compo_hit1_ratio', 'compo_hitn_ratio',
-                                  'compo_hit_acc', 'com_pred1_acc', 'com_pred2_acc', 'com_pred3_acc'],
-                metric_val_list=summary_metrics)
+                metric_name_list=["char_struc_acc", "sc_acc", "sc_top3", "sc_top5",
+                                  "lr_acc", "lr_top3", "lr_top5",
+                                  "ul_acc", "ul_top3", "ul_top5",
+                                  "correct_lr_acc", "correct_lr_top3", "correct_lr_top5",
+                                  "correct_ul_acc", "correct_ul_top3", "correct_ul_top5"],
+                metric_val_list=metrics_summary)
     train_model.summary()
     
     # for layer in train_model.layers:
     #     print(layer.name, " trainable: ", layer.trainable)
     
     # load model
-    load_path = os.path.join(CHAR_RECOG_CKPT_DIR, "char_recog_with_components_" + model_struc + "_{:04d}.h5".format(init_epochs))
+    load_path = os.path.join(CHAR_RECOG_CKPT_DIR, "char_recog_with_compo_" + model_struc + "_{:04d}.h5".format(init_epochs))
     weights_path = weights_path if os.path.exists(weights_path) else load_path
     if os.path.exists(weights_path):
         train_model.load_weights(weights_path, by_name=True)
@@ -57,17 +55,17 @@ def train(data_file, src_type, epochs, init_epochs=0, model_struc="densenet", we
                               validation_steps=10,
                               callbacks=get_callbacks(model_struc),
                               max_queue_size=100)
-
+    
     # 保存模型
-    train_model.save_weights(os.path.join(CHAR_RECOG_CKPT_DIR, "char_recog_with_components_" + model_struc + "_finished.h5"))
+    train_model.save_weights(os.path.join(CHAR_RECOG_CKPT_DIR, "char_recog_with_compo_" + model_struc + "_finished.h5"))
     
 
 def main():
     train(data_file=CHAR_TFRECORDS_PATHS_FILE,
           src_type="tfrecords",
           epochs=1000,
-          init_epochs=0,
-          model_struc="densenet",
+          init_epochs=177,
+          model_struc="densenet_gru",
           weights_path="")
 
 

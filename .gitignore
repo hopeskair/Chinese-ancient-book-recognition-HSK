@@ -39,3 +39,7 @@ chinese_fonts_finished/
 data/
 */ckpt/
 */logs/
+
+# Ignored files
+chinese_components/UCS_IDS.txt
+chinese_components/UCS_strokes.txt

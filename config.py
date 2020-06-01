@@ -298,6 +298,8 @@ SEGMENT_LINE_WEIGHTS = {
 
 # ********** Chinese character & components recognition model ************
 CHINESE_COMPO_ROOT_DIR = os.path.join(CURR_DIR, "chinese_components")
+CHINESE_SPLIT_FILE = os.path.join(CHINESE_COMPO_ROOT_DIR, "chinese_split_basic.txt")
+COMPO_SUMMARY_FILE = os.path.join(CHINESE_COMPO_ROOT_DIR, "chinese_compo_summary.txt")
 
 CHAR_RECOG_ROOT_DIR = os.path.join(CURR_DIR, "recog_with_components")
 CHAR_RECOG_CKPT_DIR = os.path.join(CURR_DIR, "recog_with_components", "ckpt")
@@ -308,8 +310,13 @@ CHAR_TFRECORDS_PATHS_FILE = os.path.join(CURR_DIR, "recog_with_components", "fil
 
 CHAR_RECOG_BATCH_SIZE = 256
 
-COMPO_SCORE_THRESH = 0.7
-COMPO_SCORE_ADJUSTMENT_SCALE = 0.1
+CHAR_RECOG_FEAT_STRIDE = 8
+COMPO_SEQ_LENGTH = CHAR_IMG_SIZE // CHAR_RECOG_FEAT_STRIDE
+
+CHAR_STRUC_TO_ID = {"s": 0, "⿰": 1, "⿱": 2}
+ID_TO_CHAR_STRUC = {0: "s", 1: "⿰", 2: "⿱"}
+
+TOP_K_TO_PRED = 10
 
 CHAE_RECOG_LOSS_WEIGHTS = {
     "chinese_class_loss": 1.,

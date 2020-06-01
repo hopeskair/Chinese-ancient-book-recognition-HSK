@@ -8,15 +8,13 @@ import json
 from config import CHINESE_COMPO_ROOT_DIR
 
 
-UNICODE_HEAD, UNICODE_TAIL = 0x4e00, 0x9fa5
-
-CHINESE_STROKES_RAW_FILE     = os.path.join(CHINESE_COMPO_ROOT_DIR, "UCS_strokes.txt")
-CHINESE_STROKES_FILE         = os.path.join(CHINESE_COMPO_ROOT_DIR, "chinese_strokes_num.txt")
-CHINESE_SPLIT_RAW_FILE       = os.path.join(CHINESE_COMPO_ROOT_DIR, "UCS_IDS.txt")
-CHINESE_SPLIT_CORRECT_FILE   = os.path.join(CHINESE_COMPO_ROOT_DIR, "UCS_IDS_to_correct.txt")
-CHINESE_SPLIT_FILE           = os.path.join(CHINESE_COMPO_ROOT_DIR, "chinese_split_basic.txt")
-COMPONENTS_SUMMARY_FILE      = os.path.join(CHINESE_COMPO_ROOT_DIR, "chinese_compo_summary.txt")
-CHINESE_STRUCTURES           = {'⿱', '⿰', '⿳', '⿲', '⿸', '⿹', '⿺', '⿶', '⿵', '⿷', '⿴', '⿻'}
+CHINESE_STROKES_RAW_FILE    = os.path.join(CHINESE_COMPO_ROOT_DIR, "UCS_strokes.txt")
+CHINESE_STROKES_FILE        = os.path.join(CHINESE_COMPO_ROOT_DIR, "chinese_strokes_num.txt")
+CHINESE_SPLIT_RAW_FILE      = os.path.join(CHINESE_COMPO_ROOT_DIR, "UCS_IDS.txt")
+CHINESE_SPLIT_CORRECT_FILE  = os.path.join(CHINESE_COMPO_ROOT_DIR, "UCS_IDS_to_correct.txt")
+CHINESE_SPLIT_FILE          = os.path.join(CHINESE_COMPO_ROOT_DIR, "chinese_split_basic.txt")
+CHINESE_STRUCTURES          = {'⿱', '⿰', '⿳', '⿲', '⿸', '⿹', '⿺', '⿶', '⿵', '⿷', '⿴', '⿻'}
+UNICODE_HEAD, UNICODE_TAIL  = 0x4e00, 0x9fa5
 
 
 def process_chinese_strokes():
@@ -95,10 +93,10 @@ def get_sub_compo_by_struc(c, split_dict=None, base_struc=None):
         if base_struc is None:
             if split_seq[0] == "⿻":
                 return [c]
-            elif split_seq[0] in "⿱⿳⿸":
-                base_struc = "⿱"
             elif split_seq[0] in "⿰⿲⿺":
                 base_struc = "⿰"
+            elif split_seq[0] in "⿱⿳⿸":
+                base_struc = "⿱"
             else:
                 # enclosed structure
                 # base_struc = "⿴"
@@ -109,10 +107,10 @@ def get_sub_compo_by_struc(c, split_dict=None, base_struc=None):
         split_seq = c
     
     curr_struc = split_seq[0]
-    if curr_struc in "⿱⿳⿸":
-        curr_struc = "⿱"
-    elif curr_struc in "⿰⿲⿺":
+    if curr_struc in "⿰⿲⿺":
         curr_struc = "⿰"
+    elif curr_struc in "⿱⿳⿸":
+        curr_struc = "⿱"
     else:
         curr_struc = "other"
     
@@ -261,17 +259,6 @@ def extract_split_info():
 
                 if base_struc == "⿻":
                     nested_chars += chinese_char
-                elif base_struc in "⿱⿳⿸":
-                    base_struc = "⿱"
-                    sub_components = get_sub_compo_by_struc(chinese_char, split_dict, base_struc=base_struc)
-                    # split_json = json.dumps([base_struc] + sub_components)
-                    split_json = ",".join([base_struc] + sub_components)
-                    ul_compo_set.update(sub_components)
-                    for c in set(sub_components):
-                        if c not in ul_compo_dict:
-                            ul_compo_dict[c] = chinese_char
-                        else:
-                            ul_compo_dict[c] += chinese_char
                 elif base_struc in "⿰⿲⿺":
                     base_struc = "⿰"
                     sub_components = get_sub_compo_by_struc(chinese_char, split_dict, base_struc=base_struc)
@@ -283,6 +270,17 @@ def extract_split_info():
                             lr_compo_dict[c] = chinese_char
                         else:
                             lr_compo_dict[c] += chinese_char
+                elif base_struc in "⿱⿳⿸":
+                    base_struc = "⿱"
+                    sub_components = get_sub_compo_by_struc(chinese_char, split_dict, base_struc=base_struc)
+                    # split_json = json.dumps([base_struc] + sub_components)
+                    split_json = ",".join([base_struc] + sub_components)
+                    ul_compo_set.update(sub_components)
+                    for c in set(sub_components):
+                        if c not in ul_compo_dict:
+                            ul_compo_dict[c] = chinese_char
+                        else:
+                            ul_compo_dict[c] += chinese_char
                 else:
                     # enclosed structure
                     enclosed_chars += chinese_char
@@ -299,35 +297,8 @@ def extract_split_info():
         #     print(c, ":", to_sort(lr_compo_dict[c], strokes_dict))
 
 
-def encode_components():
-    components_list = []
-    component_to_chinese_dict = {}
-    component_to_unicode_dict = {}
-    with open(CHINESE_SPLIT_TABLE_REPLACED, "r", encoding="utf-8") as fr:
-        for line in fr:
-            _, u_code, _, components = line.strip().split("\t")[:4]
-            chinese_char = chr(int(u_code, base=16))
-            components = components.split("/")
-            for c in components:
-                if c not in components_list:
-                    components_list.append(c)
-                    component_to_chinese_dict[c] = [chinese_char,]
-                    component_to_unicode_dict[c] = [u_code,]
-                else:
-                    component_to_chinese_dict[c].append(chinese_char)
-                    component_to_unicode_dict[c].append(u_code)
-
-    with open(COMPONENTS_SUMMARY_FILE, "w", encoding="utf-8") as fw:
-        for compo_id, component in enumerate(components_list):
-            chinese_chars = "".join(component_to_chinese_dict[component])
-            unicodes = "/".join(component_to_unicode_dict[component])
-            line_str = str(compo_id) + "\t" + component + "\t" + chinese_chars + "\t" + unicodes + "\n"
-            fw.write(line_str)
-
-
 if __name__ == '__main__':
     # process_chinese_strokes()
-    # extract_split_info()
-    # encode_components()
+    extract_split_info()
     
     print("Done !")

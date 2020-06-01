@@ -9,8 +9,9 @@ import tensorflow as tf
 from PIL import Image
 
 from config import CHAR_RECOG_BATCH_SIZE, CHAR_IMG_SIZE
-from util import CHAR2ID_DICT_TASK2 as CHAR2ID_DICT
-from util import NUM_COMPO, ID2COMPO_INDICES
+from config import CHAR_RECOG_FEAT_STRIDE, COMPO_SEQ_LENGTH
+from config import CHAR_STRUC_TO_ID, ID_TO_CHAR_STRUC
+from util import CHAR_TO_COMPO_SEQ
 
 
 class ThreadSafeGenerator:
@@ -102,14 +103,14 @@ def salt_and_pepper_noise_tf(img_tensor, proportion=0.05):
     ws = tf.random.uniform([num], 0, w - 1, dtype=tf.int64)
     hs_ws = tf.stack([hs, ws], axis=1)
     noise = tf.zeros(shape=[num, 3], dtype=img_tensor.dtype)
-    img_tensor = tf.tensor_scatter_nd_add(img_tensor, indices=hs_ws, updates=noise)
+    img_tensor = tf.tensor_scatter_nd_update(img_tensor, indices=hs_ws, updates=noise)
     
     # 盐噪声
     hs = tf.random.uniform([num], 0, h - 1, dtype=tf.int64)
     ws = tf.random.uniform([num], 0, w - 1, dtype=tf.int64)
     hs_ws = tf.stack([hs, ws], axis=1)
     noise = tf.zeros(shape=[num, 3], dtype=img_tensor.dtype) + 255
-    img_tensor = tf.tensor_scatter_nd_add(img_tensor, indices=hs_ws, updates=noise)
+    img_tensor = tf.tensor_scatter_nd_update(img_tensor, indices=hs_ws, updates=noise)
     
     return img_tensor
 
@@ -168,7 +169,7 @@ def get_img_then_augment(annotation_line, fixed_shape):
     chinese_char = os.path.basename(img_path)[0]
     
     PIL_img = Image.open(img_path)
-    PIL_img = adjust_img_to_fixed_shape(PIL_img, fixed_shape)
+    PIL_img = adjust_img_to_fixed_shape(PIL_img=PIL_img, random_crop=True, fixed_shape=fixed_shape)
     np_img = np.array(PIL_img, dtype=np.uint8)
     
     np_img = imgs_augmentation(np_img=np_img)  # image augmentation
@@ -181,29 +182,30 @@ def data_generator_with_images(annotation_lines, batch_size, fixed_shape):
     n = len(annotation_lines)
     i = 0
     while True:
-        images_list = []
-        char_ids_list = []
-        compo_embeddings = np.zeros(shape=(batch_size, NUM_COMPO), dtype=np.int8)
+        
+        batch_images = np.zeros(shape=(batch_size, *fixed_shape, 3), dtype=np.uint8) + 255  # 白底
+        char_struc = np.empty(shape=(batch_size,), dtype=np.int32)
+        components_seq = np.zeros(shape=(batch_size, COMPO_SEQ_LENGTH), dtype=np.int32)
+        
         for batch_id in range(batch_size):
             if i == 0: np.random.shuffle(annotation_lines)
             i = (i + 1) % n
             
             np_img, chinese_char = get_img_then_augment(annotation_lines[i], fixed_shape)
-            char_id = CHAR2ID_DICT[chinese_char]
+
+            compo_seq_str = CHAR_TO_COMPO_SEQ[chinese_char]
+            struc_type, compo_seq = compo_seq_str[0], compo_seq_str[1:]
+            cid_seq = [int(cid) for cid in compo_seq.split(",")]
+            cid_seq_len = len(cid_seq)
             
-            images_list.append(np_img)
-            char_ids_list.append(char_id)
-            
-            compo_indices = ID2COMPO_INDICES[char_id]
-            batch_ids = [batch_id,] * len(compo_indices)
-            compo_embeddings[batch_ids, compo_indices] = 1
+            batch_images[i] = np_img
+            char_struc[i] = CHAR_STRUC_TO_ID[struc_type]
+            components_seq[i, 0: cid_seq_len] = cid_seq
         
-        batch_images = np.stack(images_list, axis=0).astype(np.float32)
-        chinese_char_ids = np.array(char_ids_list, dtype=np.int32)
-        
+        batch_images = batch_images.astype(np.float32)
         inputs_dict = {"batch_images": batch_images,
-                       "chinese_char_ids": chinese_char_ids,
-                       "compo_embeddings": compo_embeddings}
+                       "char_struc": char_struc,
+                       "components_seq": components_seq}
         
         yield inputs_dict
 
@@ -242,15 +244,17 @@ def look_up_dict_py(char_utf8):
     # char_utf8 = char_utf8.tolist()   # scalar
     chinese_char = char_utf8.decode("utf-8")
     
-    char_id = CHAR2ID_DICT[chinese_char]
-    compo_indices = ID2COMPO_INDICES[char_id]
+    compo_seq_str = CHAR_TO_COMPO_SEQ[chinese_char]
+    struc_type, compo_seq = compo_seq_str[0], compo_seq_str[1:]
+    cid_seq = [int(cid) for cid in compo_seq.split(",")]
+    cid_seq_len = len(cid_seq)
     
-    char_id = np.array(char_id, dtype=np.int32)
-    compo_embedding = np.zeros(shape=[NUM_COMPO,], dtype=np.int8)
-    compo_embedding[compo_indices] = 1
+    struc_id = CHAR_STRUC_TO_ID[struc_type]
+    compo_seq = np.zeros(shape=[COMPO_SEQ_LENGTH,], dtype=np.int32)
+    compo_seq[0:cid_seq] = cid_seq
     
-    return char_id, compo_embedding
-    
+    return struc_id, compo_seq
+
 
 def data_generator_with_tfrecords(tfrecords_files, batch_size, fixed_shape):
     data_set = tf.data.TFRecordDataset(tfrecords_files).repeat()
@@ -274,23 +278,22 @@ def data_generator_with_tfrecords(tfrecords_files, batch_size, fixed_shape):
         
         # chinese char id
         char_utf8_tf = features['bytes_char']
-        chinese_char_id, compo_embedding = tf.numpy_function(look_up_dict_py, inp=[char_utf8_tf,], Tout=[tf.int32, tf.int8])
-        return img_tensor, chinese_char_id, compo_embedding
+        char_struc_id, compo_seq = tf.numpy_function(look_up_dict_py, inp=[char_utf8_tf], Tout=[tf.int32, tf.int32])
+        return img_tensor, char_struc_id, compo_seq
     
-    def set_dataset_outputs(batch_images, chinese_char_ids, compo_embeddings):
+    def set_dataset_outputs(batch_images, char_struc_ids, components_seq):
         # Using set_shape() to avoid errors caused by Keras failing to infer the shape of outputs.
         batch_images.set_shape([batch_size, *fixed_shape, 3])
-        chinese_char_ids.set_shape([batch_size])
-        compo_embeddings.set_shape([batch_size, NUM_COMPO])
-        return {"batch_images": batch_images, "chinese_char_ids": chinese_char_ids, "compo_embeddings": compo_embeddings}
+        char_struc_ids.set_shape([batch_size])
+        components_seq.set_shape([batch_size, COMPO_SEQ_LENGTH])
+        return {"batch_images": batch_images, "char_struc": char_struc_ids, "components_seq": components_seq}
 
     data_set = (data_set
                 .map(parse_fn, tf.data.experimental.AUTOTUNE)
                 .shuffle(2048)
                 .batch(batch_size)
                 .map(set_dataset_outputs)
-                .prefetch(200)
-    )
+                .prefetch(200))
     
     return data_set
 
@@ -304,7 +307,6 @@ def data_generator(data_file, src_type="images", validation_split=0.1):
     num_train = int(len(lines) * (1 - validation_split))
     train_lines = lines[:num_train]
     validation_lines = lines[num_train:]
-    np.random.shuffle(train_lines)
     
     if src_type == "images":
         training_generator = data_generator_with_images(train_lines, batch_size, fixed_shape)

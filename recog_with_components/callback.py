@@ -19,10 +19,10 @@ def tf_config():
         pass
 
 
-def get_callbacks(model_struc="densenet"):
+def get_callbacks(model_struc="densenet_gru"):
     check_or_makedirs(dir_name=CHAR_RECOG_CKPT_DIR)
     checkpoint = ModelCheckpoint(
-        filepath=os.path.join(CHAR_RECOG_CKPT_DIR, "char_recog_with_components_" + model_struc + "_{epoch:04d}.h5"),
+        filepath=os.path.join(CHAR_RECOG_CKPT_DIR, "char_recog_with_compo_" + model_struc + "_{epoch:04d}.h5"),
         monitor='val_loss',
         verbose=1,
         save_best_only=True,

@@ -4,9 +4,10 @@
 import os
 import shutil
 
+from chinese_components.char2compo import chinese_components_info
+
 from config import CHINESE_LABEL_FILE
 from config import IGNORABLE_CHARS_FILE, IMPORTANT_CHARS_FILE
-from chinese_components.components import chinese_components_recognition_dicts
 
 
 def check_or_makedirs(dir_name):
@@ -68,8 +69,8 @@ IGNORABLE_CHARS = ignorable_chars()
 IMPORTANT_CHARS = important_chars()
 
 # Chinese components recognition task
-ID2CHAR_DICT_TASK2, CHAR2ID_DICT_TASK2, NUM_CHARS_TASK2, NUM_COMPO, \
-ID2COMPO_INDICES, CID2CHAR_INDICES, COMPO_CO_OCCURRENCE_PROB = chinese_components_recognition_dicts()
+CHAR_TO_COMPO_SEQ, COMPO_SEQ_TO_CHAR, \
+NUM_CHAR_STRUC, NUM_SIMPLE_CHAR, NUM_LR_COMPO, NUM_UL_COMPO = chinese_components_info()
 
 
 if __name__ == '__main__':
