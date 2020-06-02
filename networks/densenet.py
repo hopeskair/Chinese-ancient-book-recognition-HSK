@@ -169,8 +169,8 @@ def DenseNet26_segment_double_line(inputs, feat_stride=16, scope="densenet"): # 
     return outputs
 
 
-def DenseNet35_for_char_recog(inputs, feat_stride=8, scope="densenet"):
-    blocks = [3, 5, 8] if feat_stride == 8 else [3, 5, 5, 5]
+def DenseNet35_for_char_recog(inputs, feat_stride=16, scope="densenet"):
+    blocks = [3, 5, 8] if feat_stride//8 == 1 else [3, 5, 5, 5]
     with backend.name_scope(scope):
         outputs = DenseNet(inputs, blocks=blocks)   # 1/8 or 1/16
         # outputs = DenseNet(inputs, blocks=[1, 1, 1, 1])  # for test

@@ -58,14 +58,12 @@ def main(img_path, model_struc="densenet_gru", weights_path=""):
             if pred_char_struc[0] == 0:
                 compo_info = "s" + str(compo_seq[0])    # simple char
             else:
+                # pred_char_struc[0] == 1, left-right char.
                 zero_indices = np.where(compo_seq == 0)[0]
                 first_zero_pos = zero_indices[0] if zero_indices.size > 0 else compo_seq.size
                 compo_str_seq = [str(compo_id) for compo_id in compo_seq[:first_zero_pos]]
-                
-                if pred_char_struc[0] == 1:
-                    compo_info = "⿰" + ",".join(compo_str_seq)  # left-right char
-                else:
-                    compo_info = "⿱" + ",".join(compo_str_seq)  # upper-lower char
+                compo_info = "⿰" + ",".join(compo_str_seq)
+            
             pred_chars_topk += COMPO_SEQ_TO_CHAR.get(compo_info, "")
         
         print("Target {} - {} Prediction.".format(chinese_char, pred_chars_topk))

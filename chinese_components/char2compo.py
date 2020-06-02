@@ -53,14 +53,14 @@ def encode_components():
             line_str = str(lr_cid) + "\t" + lr_compo + "\t" + lr_compo_dict.get(lr_compo, "EOC") + "\n"
             fw.write(line_str)
         
-        fw.write("\n\n# ⿱, components of upper-lower chinese characters\n")
-        for ul_cid, ul_compo in enumerate(ul_compo_set):
-            line_str = str(ul_cid) + "\t" + ul_compo + "\t" + ul_compo_dict.get(ul_compo, "EOC") + "\n"
-            fw.write(line_str)
+        # fw.write("\n\n# ⿱, components of upper-lower chinese characters\n")
+        # for ul_cid, ul_compo in enumerate(ul_compo_set):
+        #     line_str = str(ul_cid) + "\t" + ul_compo + "\t" + ul_compo_dict.get(ul_compo, "EOC") + "\n"
+        #     fw.write(line_str)
 
 
 def get_compo2cid_dict():
-    sc_char2cid, lr_compo2cid, ul_compo2cid = dict(), dict(), dict()
+    sc_char2cid, lr_compo2cid = dict(), dict()
     with open(COMPO_SUMMARY_FILE, "r", encoding="utf8") as fr:
         work_dict = None
         for line in fr:
@@ -69,11 +69,11 @@ def get_compo2cid_dict():
             if line.startswith("#"):
                 if "simple" in line: work_dict = sc_char2cid
                 if "⿰" in line: work_dict = lr_compo2cid
-                if "⿱" in line: work_dict = ul_compo2cid
+                # if "⿱" in line: work_dict = ul_compo2cid
                 continue
             cid, c = line.split()[:2]
             work_dict[c] = int(cid)
-    return sc_char2cid, lr_compo2cid, ul_compo2cid
+    return sc_char2cid, lr_compo2cid
 
 
 def chinese_components_info():
@@ -81,9 +81,9 @@ def chinese_components_info():
     if not os.path.exists(COMPO_SUMMARY_FILE):
         encode_components()
 
-    num_char_struc = 3  # simple, left-right, upper-lower
-    sc_char2cid, lr_compo2cid, ul_compo2cid = get_compo2cid_dict()
-    num_simple_char, num_lr_compo, num_ul_compo = len(sc_char2cid), len(lr_compo2cid), len(ul_compo2cid)
+    num_char_struc = 2  # simple, left-right
+    sc_char2cid, lr_compo2cid = get_compo2cid_dict()
+    num_simple_char, num_lr_compo = len(sc_char2cid), len(lr_compo2cid)
     
     char_to_compo_seq, compo_seq_to_char = dict(), dict()
     with open(CHINESE_SPLIT_FILE, "r", encoding="utf8") as fr:
@@ -94,8 +94,7 @@ def chinese_components_info():
             
             if components[0] == "⿰":
                 compo_info = "⿰" + ",".join([str(lr_compo2cid[c]) for c in components[1:]])
-            elif components[0] == "⿱":
-                compo_info = "⿱" + ",".join([str(ul_compo2cid[c]) for c in components[1:]])
+            # elif components[0] == "⿱":
             else:
                 assert len(components) == 1
                 compo_info = "s" + str(sc_char2cid[chinese_char])
@@ -105,7 +104,7 @@ def chinese_components_info():
     
     # pprint(char_to_compo_seq)
     # pprint(compo_seq_to_char)
-    return char_to_compo_seq, compo_seq_to_char, num_char_struc, num_simple_char, num_lr_compo, num_ul_compo
+    return char_to_compo_seq, compo_seq_to_char, num_char_struc, num_simple_char, num_lr_compo
 
 
 if __name__ == '__main__':

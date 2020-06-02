@@ -9,7 +9,7 @@ from PIL import Image
 import numpy as np
 import tensorflow as tf
 
-from util import CHAR2ID_DICT, BLANK_CHAR
+from util import CHAR2ID_DICT, BLANK_CHAR, TRADITION_CHARS
 from config import CHAR_IMG_SIZE, NUM_IMAGES_PER_FONT
 from config import FONT_FILE_DIR, EXTERNEL_IMAGES_DIR
 from config import CHAR_IMGS_DIR, CHAR_TFRECORDS_DIR
@@ -24,11 +24,16 @@ from data_generator.img_utils import generate_bigger_image_by_font, load_externa
 
 def generate_all_chinese_images_bigger(font_file, image_size=int(CHAR_IMG_SIZE*1.2)):
     all_chinese_list = list(CHAR2ID_DICT.keys())
-    # all_chinese_list = ["无", "爲", "一", "万"]
-    
     if BLANK_CHAR in all_chinese_list:
         all_chinese_list.remove(BLANK_CHAR)
-    for chinese_char in all_chinese_list:
+
+    font_name = os.path.basename(font_file)
+    if "繁" in font_name and "简" not in font_name:
+        _chinese_chars = TRADITION_CHARS
+    else:
+        _chinese_chars = "".join(all_chinese_list)
+    
+    for chinese_char in _chinese_chars:
         try:  # 生成字体图片
             bigger_PIL_img = generate_bigger_image_by_font(chinese_char, font_file, image_size)
         except OSError:
@@ -48,7 +53,7 @@ def generate_chinese_images_to_check(obj_size=CHAR_IMG_SIZE, augmentation=False)
     chinese_char_num = len(CHAR2ID_DICT)
     total_num = len(font_file_list) * chinese_char_num
     count = 0
-    for font_file in font_file_list:
+    for font_file in font_file_list:    # 外层循环是字体
         font_name = os.path.basename(font_file)
         font_type = font_name.split(".")[0]
         
@@ -56,7 +61,7 @@ def generate_chinese_images_to_check(obj_size=CHAR_IMG_SIZE, augmentation=False)
         font_img_dir = os.path.join(CHAR_IMGS_DIR, font_type)
         remove_then_makedirs(font_img_dir)
         
-        for chinese_char, bigger_PIL_img in generate_all_chinese_images_bigger(font_file, image_size=int(obj_size*1.2)):
+        for chinese_char, bigger_PIL_img in generate_all_chinese_images_bigger(font_file, image_size=int(obj_size*1.2)):    # 内层循环是字
             # 检查生成的灰度图像是否可用，黑底白字
             image_data = list(bigger_PIL_img.getdata())
             if sum(image_data) < 10:

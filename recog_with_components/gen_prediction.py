@@ -51,7 +51,7 @@ class GeneratePrediction(layers.Layer):
         super(GeneratePrediction, self).__init__(**kwargs)
     
     def call(self, inputs, **kwargs):
-        pred_char_struc, pred_sc_logits, pred_lr_compo_logits, pred_ul_compo_logits = inputs
+        pred_char_struc, pred_sc_logits, pred_lr_compo_logits = inputs
         
         # 简单汉字预测
         _, pred_sc_labels = tf.math.top_k(pred_sc_logits, k=self.topk, sorted=True)
@@ -60,7 +60,7 @@ class GeneratePrediction(layers.Layer):
         pred_lr_compo_seq, _ = topk_compo_seq(pred_lr_compo_logits, k=self.topk, sorted=True)
         
         # 上下结构汉字部件预测
-        pred_ul_compo_seq, _ = topk_compo_seq(pred_ul_compo_logits, k=self.topk, sorted=True)
+        # pred_ul_compo_seq, _ = topk_compo_seq(pred_ul_compo_logits, k=self.topk, sorted=True)
         
         # 输出形式
         if self.stage != "train":
@@ -68,21 +68,21 @@ class GeneratePrediction(layers.Layer):
             
             pred_sc_batch_indices = tf.where(pred_char_struc == 0)
             pred_lr_batch_indices = tf.where(pred_char_struc == 1)
-            pred_ul_batch_indices = tf.where(pred_char_struc == 2)
+            # pred_ul_batch_indices = tf.where(pred_char_struc == 2)
             
             sc_num = tf.shape(pred_sc_batch_indices)[0]
             lr_num = tf.shape(pred_lr_batch_indices)[0]
-            ul_num = tf.shape(pred_ul_batch_indices)[0]
+            # ul_num = tf.shape(pred_ul_batch_indices)[0]
 
             pred_sc_batch_indices = tf.tile(pred_sc_batch_indices, multiples=[1, self.topk])
             pred_lr_batch_indices = tf.tile(pred_lr_batch_indices, multiples=[1, self.topk])
-            pred_ul_batch_indices = tf.tile(pred_ul_batch_indices, multiples=[1, self.topk])
+            # pred_ul_batch_indices = tf.tile(pred_ul_batch_indices, multiples=[1, self.topk])
             
             order_indices = tf.range(self.topk, dtype=tf.int32)[tf.newaxis, :]
             
             sc_order_indices = tf.tile(order_indices, multiples=[sc_num, 1])
             lr_order_indices = tf.tile(order_indices, multiples=[lr_num, 1])
-            ul_order_indices = tf.tile(order_indices, multiples=[ul_num, 1])
+            # ul_order_indices = tf.tile(order_indices, multiples=[ul_num, 1])
             
             # sc prediction
             _first_pos = tf.zeros_like(pred_sc_batch_indices, dtype=tf.int32)
@@ -92,20 +92,20 @@ class GeneratePrediction(layers.Layer):
                                          shape=(batch_size, self.topk, seq_len))  # initially zero
             
             # lr prediction
-            lr_indices = tf.stack([pred_lr_batch_indices, sc_order_indices], axis=2)
+            lr_indices = tf.stack([pred_lr_batch_indices, lr_order_indices], axis=2)
             pred_results = tf.tensor_scatter_nd_add(tensor=pred_results,
                                                     indices=lr_indices,
                                                     updates=pred_lr_compo_seq)
             
             # ul prediction
-            ul_indices = tf.stack([pred_ul_batch_indices, ul_order_indices], axis=2)
-            pred_results = tf.tensor_scatter_nd_add(tensor=pred_results,
-                                                    indices=ul_indices,
-                                                    updates=pred_ul_compo_seq)
+            # ul_indices = tf.stack([pred_ul_batch_indices, ul_order_indices], axis=2)
+            # pred_results = tf.tensor_scatter_nd_add(tensor=pred_results,
+            #                                         indices=ul_indices,
+            #                                         updates=pred_ul_compo_seq)
         else:
             pred_results = tf.zeros([], dtype=tf.int32)
         
-        return pred_sc_labels, pred_lr_compo_seq, pred_ul_compo_seq, pred_results
+        return pred_sc_labels, pred_lr_compo_seq, pred_results
         
         
 if __name__ == '__main__':

@@ -8,6 +8,7 @@ import os
 # os.getcwd() returns the current working directory
 CURR_DIR = os.path.dirname(__file__)    # .replace("/", os.sep)
 CHINESE_LABEL_FILE = os.path.join(CURR_DIR, "chinese_labels", "chinese_labels_all.txt")
+TRADITION_CHARS_FILE = os.path.join(CURR_DIR, "chinese_labels", "chars_Big5_all_traditional_13053.txt")
 IGNORABLE_CHARS_FILE = os.path.join(CURR_DIR, "chinese_labels", "ignorable_chars.txt")
 IMPORTANT_CHARS_FILE = os.path.join(CURR_DIR, "chinese_labels", "important_chars.txt")
 # ************************ basic configuration ***************************
@@ -310,16 +311,23 @@ CHAR_TFRECORDS_PATHS_FILE = os.path.join(CURR_DIR, "recog_with_components", "fil
 
 CHAR_RECOG_BATCH_SIZE = 256
 
-CHAR_RECOG_FEAT_STRIDE = 8
+CHAR_RECOG_FEAT_STRIDE = 16
 COMPO_SEQ_LENGTH = CHAR_IMG_SIZE // CHAR_RECOG_FEAT_STRIDE
 
-CHAR_STRUC_TO_ID = {"s": 0, "⿰": 1, "⿱": 2}
-ID_TO_CHAR_STRUC = {0: "s", 1: "⿰", 2: "⿱"}
+CHAR_STRUC_TO_ID = {"s": 0, "⿰": 1,
+                    # "⿱": 2
+                    }
+
+ID_TO_CHAR_STRUC = {0: "s", 1: "⿰",
+                    # 2: "⿱"
+                    }
 
 TOP_K_TO_PRED = 10
 
 CHAE_RECOG_LOSS_WEIGHTS = {
-    "chinese_class_loss": 1.,
-    "chinese_compo_loss": 20.
+    "char_struc_loss": 1.,
+    "sc_char_loss": 1.,
+    "lr_compo_loss": 1.,
+    # "ul_compo_loss": 1.
 }
 # ********** Chinese character & components recognition model ************

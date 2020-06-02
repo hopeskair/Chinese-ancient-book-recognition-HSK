@@ -251,7 +251,7 @@ def look_up_dict_py(char_utf8):
     
     struc_id = CHAR_STRUC_TO_ID[struc_type]
     compo_seq = np.zeros(shape=[COMPO_SEQ_LENGTH,], dtype=np.int32)
-    compo_seq[0:cid_seq] = cid_seq
+    compo_seq[0:cid_seq_len] = cid_seq
     
     return struc_id, compo_seq
 

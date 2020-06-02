@@ -20,16 +20,15 @@ def train(data_file, src_type, epochs, init_epochs=0, model_struc="densenet_gru"
     
     # 加载模型
     train_model = work_net(stage="train", img_size=CHAR_IMG_SIZE, model_struc=model_struc)
-    compile(train_model, loss_names=["char_struc_loss", "sc_char_loss", "lr_compo_loss", "ul_compo_loss"])
+    compile(train_model, loss_names=["char_struc_loss", "sc_char_loss", "lr_compo_loss"])
     
     # 增加度量汇总
     metrics_summary = train_model.get_layer('summary_fn').output
     add_metrics(train_model,
                 metric_name_list=["char_struc_acc", "sc_acc", "sc_top3", "sc_top5",
                                   "lr_acc", "lr_top3", "lr_top5",
-                                  "ul_acc", "ul_top3", "ul_top5",
                                   "correct_lr_acc", "correct_lr_top3", "correct_lr_top5",
-                                  "correct_ul_acc", "correct_ul_top3", "correct_ul_top5"],
+                                  "total_acc", "total_top3", "total_top5"],
                 metric_val_list=metrics_summary)
     train_model.summary()
     
