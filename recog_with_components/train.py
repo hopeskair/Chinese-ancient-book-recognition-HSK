@@ -62,8 +62,8 @@ def train(data_file, src_type, epochs, init_epochs=0, model_struc="densenet_gru"
 def main():
     train(data_file=CHAR_TFRECORDS_PATHS_FILE,
           src_type="tfrecords",
-          epochs=1000,
-          init_epochs=177,
+          epochs=10,
+          init_epochs=0,
           model_struc="densenet_gru",
           weights_path="")
 

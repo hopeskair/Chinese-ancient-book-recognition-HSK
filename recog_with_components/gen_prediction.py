@@ -6,41 +6,43 @@ from tensorflow.keras import layers
 
 
 def topk_compo_seq(compo_logits, k=10, sorted=True):
-    compo_scores = tf.math.softmax(compo_logits, axis=-1)
-    compo_scores = tf.math.log(compo_scores)
+    compo_scores = tf.math.log_softmax(compo_logits, axis=-1)
+    compo_scores, compo_indices = tf.math.top_k(compo_scores, k=k, sorted=sorted)
     
     _shape = tf.shape(compo_scores)
     bsize, seq_len = _shape[0], _shape[1]
     
-    topk_seq = tf.zeros((bsize, k, 0), dtype=tf.int32)
-    seq_scores = tf.zeros((bsize, k), dtype=tf.float32)
+    top_k_sequences = tf.expand_dims(compo_indices[:, 0], axis=2)
+    sequence_scores = compo_scores[:, 0]
     
-    def loop_body(i, _topk_seq, _seq_scores):
-        curr_scores, curr_indices = tf.math.top_k(compo_scores[:, i], k=k, sorted=sorted)
+    def loop_body(i, top_k_seq, seq_scores):
+        prev_scores = tf.expand_dims(seq_scores, axis=2)            # (bsize, k, 1)
+        next_scores = tf.expand_dims(compo_scores[:, i], axis=1)    # (bsize, 1, k)
+        _seq_scores = prev_scores + next_scores                     # (bsize, k, k)
+        _seq_scores = tf.reshape(_seq_scores, shape=(bsize, k*k))   # (bsize, k*k)
+        seq_scores, topk_coord = tf.math.top_k(_seq_scores, k=k, sorted=sorted)
         
-        _seq_scores = tf.expand_dims(_seq_scores, axis=2)   # (bsize, k, 1)
-        curr_scores = tf.expand_dims(curr_scores, axis=1)   # (bsize, 1, k)
-        _seq_scores += curr_scores                          # (bsize, k, k)
-        _seq_scores = tf.reshape((bsize, k*k))              # (bsize, k*k)
-        new_seq_scores, _topk_indices = tf.math.top_k(_seq_scores, k=k, sorted=sorted)
+        r_coord, c_coord = topk_coord // k, topk_coord % k
+        b_coord = tf.range(bsize, dtype=tf.int32)[:, tf.newaxis]
+        b_coord = tf.tile(b_coord, multiples=[1, k])
+        b_r_coord = tf.stack([b_coord, r_coord], axis=2)
+        b_c_coord = tf.stack([b_coord, c_coord], axis=2)
         
-        _r, _c = _topk_indices // k, _topk_indices % k
-        _b = tf.range(bsize, dtype=tf.int32)[:, tf.newaxis]
-        _b = tf.tile(_b, multiples=[1, k])
-        _b_r = tf.stack([_b, _r], axis=2)
-        _b_c = tf.stack([_b, _c], axis=2)
+        prev_seq = tf.gather_nd(top_k_seq, indices=b_r_coord)
+        next_seq = tf.gather_nd(compo_indices[:, i], indices=b_c_coord)[:, :, tf.newaxis]
+        top_k_seq = tf.concat([prev_seq, next_seq], axis=2)
         
-        _pre_seq = tf.gather_nd(_topk_seq, indices=_b_r)
-        _curr_seq = tf.gather_nd(curr_indices, indices=_b_c)[..., tf.newaxis]
-        new_topk_seq = tf.concat([_pre_seq, _curr_seq], axis=2)
-        
-        return i+1, new_topk_seq, new_seq_scores
-
-    _, topk_seq, seq_scores = tf.while_loop(cond=lambda i, *unused_args: i<seq_len,
-                                            body=loop_body,
-                                            loop_vars=[0, topk_seq, seq_scores])
+        return i+1, top_k_seq, seq_scores
     
-    return topk_seq, seq_scores
+    _, top_k_sequences, sequence_scores = tf.while_loop(cond=lambda i, *unused_args: i<seq_len,
+                                                        body=loop_body,
+                                                        loop_vars=[1, top_k_sequences, sequence_scores],    # 从1开始
+                                                        shape_invariants=[tf.TensorShape([]),
+                                                                          tf.TensorShape([None, k, None]),
+                                                                          sequence_scores.get_shape()]
+                                                        )
+    
+    return top_k_sequences, sequence_scores
     
 
 class GeneratePrediction(layers.Layer):

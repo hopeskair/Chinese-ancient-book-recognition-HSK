@@ -159,7 +159,9 @@ def adjust_img_to_fixed_shape(PIL_img=None, np_img=None, random_crop=False, fixe
         new_w, new_h = int(raw_w * scale_ratio), int(raw_h * scale_ratio)
         PIL_img = PIL_img.resize(size=(new_w, new_h))
         x1, y1 = (obj_w - new_w) // 2, (obj_h - raw_h) // 2
-        PIL_img = Image.new("RGB", size=(obj_w, obj_h), color="white").paste(PIL_img, box=(x1, y1))
+        PIL_background = Image.new("RGB", size=(obj_w, obj_h), color="white")
+        PIL_background.paste(PIL_img, box=(x1, y1))
+        PIL_img = PIL_background
     
     return PIL_img
 
@@ -189,18 +191,18 @@ def data_generator_with_images(annotation_lines, batch_size, fixed_shape):
         
         for batch_id in range(batch_size):
             if i == 0: np.random.shuffle(annotation_lines)
-            i = (i + 1) % n
             
             np_img, chinese_char = get_img_then_augment(annotation_lines[i], fixed_shape)
+            i = (i + 1) % n
 
             compo_seq_str = CHAR_TO_COMPO_SEQ[chinese_char]
             struc_type, compo_seq = compo_seq_str[0], compo_seq_str[1:]
             cid_seq = [int(cid) for cid in compo_seq.split(",")]
             cid_seq_len = len(cid_seq)
             
-            batch_images[i] = np_img
-            char_struc[i] = CHAR_STRUC_TO_ID[struc_type]
-            components_seq[i, 0: cid_seq_len] = cid_seq
+            batch_images[batch_id] = np_img
+            char_struc[batch_id] = CHAR_STRUC_TO_ID[struc_type]
+            components_seq[batch_id, 0: cid_seq_len] = cid_seq
         
         batch_images = batch_images.astype(np.float32)
         inputs_dict = {"batch_images": batch_images,
@@ -249,7 +251,7 @@ def look_up_dict_py(char_utf8):
     cid_seq = [int(cid) for cid in compo_seq.split(",")]
     cid_seq_len = len(cid_seq)
     
-    struc_id = CHAR_STRUC_TO_ID[struc_type]
+    struc_id = np.array(CHAR_STRUC_TO_ID[struc_type], dtype=np.int32)
     compo_seq = np.zeros(shape=[COMPO_SEQ_LENGTH,], dtype=np.int32)
     compo_seq[0:cid_seq_len] = cid_seq
     
