@@ -44,13 +44,6 @@ def chinese_labels_dict():
     return id2char_dict, char2id_dict, num_chars
 
 
-def traditional_chars():
-    with open(TRADITION_CHARS_FILE, "r", encoding="utf-8") as fr:
-        tradition_chars = fr.read()
-        tradition_chars = tradition_chars.strip()
-    return tradition_chars
-
-
 def ignorable_chars():
     chars = set()
     with open(IGNORABLE_CHARS_FILE, "r", encoding="utf-8") as fr:
@@ -72,9 +65,19 @@ def important_chars():
 # General tasks
 ID2CHAR_DICT, CHAR2ID_DICT, NUM_CHARS = chinese_labels_dict()
 BLANK_CHAR = ID2CHAR_DICT[0]
-TRADITION_CHARS = traditional_chars()
 IGNORABLE_CHARS = ignorable_chars()
 IMPORTANT_CHARS = important_chars()
+
+
+def traditional_chars():
+    with open(TRADITION_CHARS_FILE, "r", encoding="utf-8") as fr:
+        tradition_chars = fr.read()
+        tradition_chars = tradition_chars.strip()
+    tradition_chars = "".join([c for c in tradition_chars if c in CHAR2ID_DICT])
+    return tradition_chars
+
+
+TRADITION_CHARS = traditional_chars()
 
 # Chinese components recognition task
 CHAR_TO_COMPO_SEQ, COMPO_SEQ_TO_CHAR, NUM_CHAR_STRUC, NUM_SIMPLE_CHAR, NUM_LR_COMPO = chinese_components_info()

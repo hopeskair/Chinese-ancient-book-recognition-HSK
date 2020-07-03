@@ -101,7 +101,7 @@ def imgs_augmentation_tf(img_tensors):
     img_tensors = tf.image.random_brightness(img_tensors, max_delta=0.5)
     img_tensors = tf.image.random_contrast(img_tensors, lower=0.5, upper=1.)
     img_tensors = tf.image.random_hue(img_tensors, max_delta=0.5)
-    img_tensors = tf.image.random_saturation(img_tensors, lower=0., upper=2)
+    img_tensors = tf.image.random_saturation(img_tensors, lower=0., upper=2.)
     return img_tensors
 
 
@@ -161,7 +161,7 @@ def tilt_text_img_py(np_img, split_positions, segment_task):
     pad_width = ((0, 0), (incline, incline)) if len(raw_shape) == 2 else ((0, 0), (incline, incline), (0, 0))
     np_img = np.pad(np_img, pad_width, mode="constant", constant_values=255)  # 白底黑字
     
-    # quad_coordinates: 8-tuple (x0, y0, x1, y1, x2, y2, y3, y3), they are
+    # quad_coordinates: 8-tuple (x0, y0, x1, y1, x2, y2, x3, y3), they are
     # upper left, lower left, lower right, and upper right corner of the source quadrilateral.
     quad_coordinates_rightward = (0, 0, incline, raw_h - 1, 2 * incline + raw_w - 1, raw_h - 1, incline + raw_w - 1, 0)
     quad_coordinates_leftward = (incline, 0, 0, raw_h - 1, incline + raw_w - 1, raw_h - 1, 2 * incline + raw_w - 1, 0)
@@ -181,7 +181,7 @@ def tilt_text_img_py(np_img, split_positions, segment_task):
     return [np_img, split_positions]
 
 
-def adjust_img_to_fixed_shape(np_img, split_positions=None, fixed_shape=(560, None), feat_stride=16, segment_task="book_page", text_type="horizontal"):
+def adjust_img_to_fixed_height(np_img, split_positions=None, fixed_h=560, segment_task="book_page", text_type="horizontal"):
     # rotate 90 degrees rightward.
     text_type = text_type[0].lower()
     if (segment_task, text_type) in (("book_page", "h"), ("double_line", "h"), ("text_line", "v"), ("mix_line", "v")):
@@ -193,14 +193,12 @@ def adjust_img_to_fixed_shape(np_img, split_positions=None, fixed_shape=(560, No
     
     # scale image to fixed shape
     raw_h, raw_w = np_img.shape[:2]
-    fixed_h, fixed_w = fixed_shape
     if segment_task in ("book_page", "mix_line", "text_line"):
-        scale_ratio = fixed_h / raw_h       # fixed_h是16的倍数, fixed_w为None
-        fixed_w = int(raw_w * scale_ratio)  # 在打包batch时，将调整为16的倍数
+        scale_ratio = fixed_h / raw_h       # fixed_h是16的倍数
+        fixed_w = int(raw_w * scale_ratio)  # 等比例缩放, 在打包batch时, 将调整为16的倍数
     else:
-        scale_ratio = fixed_w / raw_w       # double_line情况, fixed_h为None, fixed_w是16的倍数
-        fixed_h = int(raw_h * scale_ratio)
-        fixed_h += -fixed_h % feat_stride   # 调整为16的倍数
+        fixed_w = raw_w       # double_line情况, 等宽缩放, 在打包batch时, 将调整为16的倍数
+        scale_ratio = 1.0
     np_img = transform.resize(np_img, output_shape=(fixed_h, fixed_w))  # float32
     np_img = np_img.astype(np.uint8)
     
@@ -211,7 +209,7 @@ def adjust_img_to_fixed_shape(np_img, split_positions=None, fixed_shape=(560, No
     return np_img, split_positions, scale_ratio
 
 
-def adjust_img_to_fixed_shape_tf(img_tensor, split_positions, fixed_shape=(560, None), feat_stride=16, segment_task="book_page", text_type="horizontal"):
+def adjust_img_to_fixed_height_tf(img_tensor, split_positions, fixed_h=560, segment_task="book_page", text_type="horizontal"):
     # rotate 90 degrees rightward.
     text_type = text_type[0].lower()
     if (segment_task, text_type) in (("book_page", "h"), ("double_line", "h"), ("text_line", "v"), ("mix_line", "v")):
@@ -223,14 +221,12 @@ def adjust_img_to_fixed_shape_tf(img_tensor, split_positions, fixed_shape=(560, 
     
     # scale image to fixed size
     raw_shape = tf.cast(tf.shape(img_tensor)[:2], tf.float32)
-    fixed_h, fixed_w = fixed_shape
     if segment_task in ("book_page", "mix_line", "text_line"):
-        scale_ratio = fixed_h / raw_shape[0]                    # fixed_h是16的倍数, fixed_w为None
-        fixed_w = tf.cast(raw_shape[1] * scale_ratio, tf.int32) # 在打包batch后，将调整为16的倍数
+        scale_ratio = fixed_h / raw_shape[0]                    # fixed_h是16的倍数
+        fixed_w = tf.cast(raw_shape[1] * scale_ratio, tf.int32) # 等比例缩放, 在打包batch后，将调整为16的倍数
     else:
-        scale_ratio = fixed_w / raw_shape[1]                    # double_line情况, fixed_h为None, fixed_w是16的倍数
-        fixed_h = tf.cast(raw_shape[0] * scale_ratio, tf.int32)
-        fixed_h += -fixed_h % feat_stride                       # 调整为16的倍数
+        fixed_w = raw_shape[1]                    # double_line情况, 等宽缩放, 在打包batch时, 将调整为16的倍数
+        scale_ratio = 1.
     img_tensor = tf.image.resize(img_tensor, size=[fixed_h, fixed_w])  # float32
     img_tensor = tf.cast(img_tensor, dtype=tf.uint8)
     split_positions = split_positions * scale_ratio
@@ -252,26 +248,29 @@ def get_image_and_split_pos(annotation_line, segment_task="book_page"):
     split_pos = json.loads(line[1])["split_pos_list"]
     split_pos = np.array(split_pos, dtype=np.float32)
     split_pos.sort()    # 排序
-    if segment_task in ("double_line",):
-        split_pos = split_pos[1: -1] # 首尾的切分线不需要学习
+    # if segment_task in ("double_line",):
+    #     split_pos = split_pos[1: -1] # 首尾的切分线不需要学习
     split_pos = np.tile(split_pos[:, np.newaxis], reps=(1, 2))
     
     return np_img, split_pos
 
 
-def pack_a_batch(imgs_list, split_pos_list, feat_stride=16, background="white"):
+def pack_a_batch(imgs_list, split_pos_list=None, feat_stride=16, background="white"):
     # assert len(imgs_list) == len(split_pos_list)
     batch_size = len(imgs_list)
     
-    num_split = max([len(split_pos) for split_pos in split_pos_list])
-    split_positions = -1 * np.ones(shape=(batch_size, num_split, 2), dtype=np.float32)  # padding -1
+    if split_pos_list is not None:  # train
+        num_split = max([len(split_pos) for split_pos in split_pos_list])
+        split_positions = -1 * np.ones(shape=(batch_size, num_split, 2), dtype=np.float32)  # padding:-1
+    else:   # test
+        split_positions = None
     
     fixed_h = imgs_list[0].shape[0]
     imgs_w = [np_img.shape[1] for np_img in imgs_list]
     max_w = max([w for w in imgs_w])
     max_w += -max_w % feat_stride
     batch_imgs = np.empty(shape=(batch_size, fixed_h, max_w, 3), dtype=np.float32)
-    real_images_width = np.array(imgs_w, dtype=np.int32)
+    real_images_width = np.array(imgs_w, dtype=np.float32)
     if background == "white":
         batch_imgs.fill(255)
     elif background == "black":
@@ -282,9 +281,10 @@ def pack_a_batch(imgs_list, split_pos_list, feat_stride=16, background="white"):
     for i, np_img in enumerate(imgs_list):
         img_h, img_w = np_img.shape[:2]
         batch_imgs[i, :img_h, :img_w] = np_img
-        batch_imgs[i] = imgs_augmentation(np_img=batch_imgs[i]) # image augmentation
-        num = len(split_pos_list[i])
-        split_positions[i, :num, :] = split_pos_list[i]
+        if split_pos_list is not None:  # train
+            batch_imgs[i] = imgs_augmentation(np_img=batch_imgs[i]) # image augmentation
+            num = len(split_pos_list[i])
+            split_positions[i, :num, :] = split_pos_list[i]
     
     return batch_imgs, real_images_width, split_positions
 
@@ -292,7 +292,7 @@ def pack_a_batch(imgs_list, split_pos_list, feat_stride=16, background="white"):
 @threadsafe_generator
 def data_generator_with_images(annotation_lines,
                                batch_size,
-                               fixed_shape,
+                               fixed_h,
                                feat_stride=16,
                                segment_task="book_page",
                                text_type="horizontal"):
@@ -305,7 +305,7 @@ def data_generator_with_images(annotation_lines,
         for _ in range(batch_size):
             if i == 0: np.random.shuffle(annotation_lines)
             np_img, split_positions = get_image_and_split_pos(annotation_lines[i], segment_task)
-            np_img, split_positions, _ = adjust_img_to_fixed_shape(np_img, split_positions, fixed_shape, feat_stride, segment_task, text_type)
+            np_img, split_positions, _ = adjust_img_to_fixed_height(np_img, split_positions, fixed_h, segment_task, text_type)
             images_list.append(np_img)
             split_pos_list.append(split_positions)
             i = (i + 1) % n
@@ -353,7 +353,7 @@ def parse_fn(serialized_example, segment_task="book_page"):
 
 def data_generator_with_tfrecords(tfrecords_files,
                                   batch_size,
-                                  fixed_shape,
+                                  fixed_h,
                                   feat_stride=16,
                                   segment_task="book_page",
                                   text_type="horizontal"):
@@ -372,12 +372,12 @@ def data_generator_with_tfrecords(tfrecords_files,
         split_positions = tf.reshape(split_positions, shape=(-1,))
         order_indices = tf.argsort(split_positions, axis=0)         # 排序
         split_positions = tf.gather(split_positions, order_indices) # 排序
-        if segment_task in ("double_line",):
-            split_positions = split_positions[1: -1]    # 首尾的切分线不需要学习
+        # if segment_task in ("double_line",):
+        #     split_positions = split_positions[1: -1]    # 首尾的切分线不需要学习
         split_positions = tf.tile(split_positions[:, tf.newaxis], multiples=[1, 2])
         split_positions = tf.cast(split_positions, tf.float32)
 
-        img_tensor, split_positions = adjust_img_to_fixed_shape_tf(img_tensor, split_positions, fixed_shape, feat_stride, segment_task, text_type)
+        img_tensor, split_positions = adjust_img_to_fixed_height_tf(img_tensor, split_positions, fixed_h, segment_task, text_type)
         img_width = tf.cast(tf.shape(img_tensor)[1], tf.float32)
         
         return img_tensor, img_width, split_positions
@@ -391,7 +391,6 @@ def data_generator_with_tfrecords(tfrecords_files,
         inputs_dict = {"batch_images": batch_imgs, "real_images_width": real_images_width, "split_lines_pos": split_positions}
         return  inputs_dict
     
-    fixed_h = fixed_shape[0]    # None if segment_task is double_line.
     padded_shapes = (tf.TensorShape([fixed_h, None, 3]), tf.TensorShape([]), tf.TensorShape([None, 2]))
     padding_values = (tf.constant(255, tf.uint8), tf.constant(-1, tf.float32), tf.constant(-1, tf.float32))
     data_set = (data_set
@@ -407,7 +406,7 @@ def data_generator_with_tfrecords(tfrecords_files,
 
 def data_generator(data_file, src_type="images", segment_task="book_page", text_type="horizontal", validation_split=0.1):
     """data generator for fit_generator"""
-    batch_size, fixed_shape, feat_stride = get_segment_task_params(segment_task)
+    batch_size, fixed_h, feat_stride = get_segment_task_params(segment_task)
     
     with open(data_file, "r", encoding="utf8") as fr:
         lines = [line.strip() for line in fr.readlines()]
@@ -417,11 +416,11 @@ def data_generator(data_file, src_type="images", segment_task="book_page", text_
     np.random.shuffle(train_lines)
     
     if src_type == "images":
-        training_generator = data_generator_with_images(train_lines, batch_size, fixed_shape, feat_stride, segment_task, text_type)
-        validation_generator = data_generator_with_images(validation_lines, batch_size, fixed_shape, feat_stride, segment_task, text_type)
+        training_generator = data_generator_with_images(train_lines, batch_size, fixed_h, feat_stride, segment_task, text_type)
+        validation_generator = data_generator_with_images(validation_lines, batch_size, fixed_h, feat_stride, segment_task, text_type)
     elif src_type == "tfrecords":
-        training_generator = data_generator_with_tfrecords(train_lines, batch_size, fixed_shape, feat_stride, segment_task, text_type)
-        validation_generator = data_generator_with_tfrecords(validation_lines, batch_size, fixed_shape, feat_stride, segment_task, text_type)
+        training_generator = data_generator_with_tfrecords(train_lines, batch_size, fixed_h, feat_stride, segment_task, text_type)
+        validation_generator = data_generator_with_tfrecords(validation_lines, batch_size, fixed_h, feat_stride, segment_task, text_type)
     else:
         ValueError("Optional src type: 'images', 'tfrecords'.")
         

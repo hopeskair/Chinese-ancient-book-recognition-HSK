@@ -7,7 +7,7 @@ import tensorflow as tf
 import numpy as np
 
 from config import SEGMENT_ROOT_DIR, SEGMENT_CKPT_DIR, SEGMENT_LOGS_DIR
-from config import SEGMENT_BATCH_SIZE, SEGMENT_FIXED_SHAPE, SEGMENT_FEATURE_STRIDE
+from config import SEGMENT_BATCH_SIZE, SEGMENT_FIXED_HEIGHT, SEGMENT_FEATURE_STRIDE
 from config import SEGMENT_CLS_SCORE_THRESH, SEGMENT_DISTANCE_THRESH, SEGMENT_NMS_MAX_OUTPUTS
 
 
@@ -64,9 +64,9 @@ def get_segment_task_path(segment_task):
 
 def get_segment_task_params(segment_task):
     batch_size = SEGMENT_BATCH_SIZE[segment_task]
-    fixed_shape = SEGMENT_FIXED_SHAPE[segment_task]
+    fixed_h = SEGMENT_FIXED_HEIGHT[segment_task]
     feat_stride = SEGMENT_FEATURE_STRIDE[segment_task]
-    return batch_size, fixed_shape, feat_stride
+    return batch_size, fixed_h, feat_stride
 
 
 def get_segment_task_thresh(segment_task):

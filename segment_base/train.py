@@ -21,11 +21,13 @@ def main(data_file, src_type, text_type, segment_task, epochs, init_epochs=0, mo
     compile(train_model, loss_names=['segment_class_loss', 'segment_regress_loss'])
     
     # 增加度量汇总
-    total_acc, pos_acc, neg_acc = train_model.get_layer('accuracy').output
+    total_acc, pos_acc, neg_acc, nms_acc, nms_pos_acc, nms_neg_acc = train_model.get_layer('accuracy').output
     num_pos, num_neg = train_model.get_layer('segment_target').output[4:]
     add_metrics(train_model,
-                metric_name_list=['total_acc', 'pos_acc', 'neg_acc', 'num_pos', 'num_neg'],
-                metric_val_list=[total_acc, pos_acc, neg_acc, num_pos, num_neg])
+                metric_name_list=['total_acc', 'pos_acc', 'neg_acc',
+                                  'nms_acc', 'nms_pos_acc', 'nms_neg_acc',
+                                  'num_pos', 'num_neg'],
+                metric_val_list=[total_acc, pos_acc, neg_acc, nms_acc, nms_pos_acc, nms_neg_acc, num_pos, num_neg])
     train_model.summary()
     
     # for layer in train_model.layers:

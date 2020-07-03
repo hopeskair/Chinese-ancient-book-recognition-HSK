@@ -4,12 +4,12 @@
 from segment_base.predict import segment_predict
 
 
-def segment_book_page_predict():
+def segment_text_line_predict():
     segment_predict(images=None,
                     img_paths="***",
                     dest_dir="***",
                     segment_model=None,
-                    segment_task="book_page",
+                    segment_task="text_line",
                     text_type="vertical",
                     model_struc="densenet_gru",
                     weights="")

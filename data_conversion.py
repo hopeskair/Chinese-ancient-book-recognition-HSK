@@ -32,8 +32,8 @@ if __name__ == '__main__':
     # segment_book_page_main()
     # segment_mix_line_main()
     # segment_text_line_main()
-    # segment_double_line_main()
+    segment_double_line_main()
     
-    extract_paths_main()
+    # extract_paths_main()
     
     print("Done !")

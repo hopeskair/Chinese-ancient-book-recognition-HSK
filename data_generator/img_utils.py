@@ -60,12 +60,55 @@ def add_noise(np_img):
     return np_img
 
 
+# 图片增强, 高斯噪声
+def gauss_noise(np_img):
+    np_img = np_img.astype(np.float32)  # 此步是为了避免像素点小于0，大于255的情况
+    
+    noise = np.random.normal(0, 60, size=np_img.shape)
+    np_img = np_img + noise
+    np_img[np_img < 0] = 0
+    np_img[np_img > 255] = 255
+    np_img = np_img.astype(np.uint8)
+    
+    return np_img
+
+
+# 图片增强, 椒盐噪声
+def salt_and_pepper_noise(np_img, proportion=0.05):
+    h, w = np_img.shape[:2]
+    num = int(h * w * proportion) // 2  # 添加椒盐噪声的个数
+    
+    # 椒噪声
+    hs = np.random.randint(0, h - 1, size=[num], dtype=np.int64)
+    ws = np.random.randint(0, w - 1, size=[num], dtype=np.int64)
+    np_img[hs, ws] = 0
+    
+    # 盐噪声
+    hs = np.random.randint(0, h - 1, size=[num], dtype=np.int64)
+    ws = np.random.randint(0, w - 1, size=[num], dtype=np.int64)
+    np_img[hs, ws] = 255
+    
+    return np_img
+
+
+# 随机裁剪
+def random_crop(PIL_img):
+    raw_w, raw_h = PIL_img.size
+    crop_w, crop_h = np.random.uniform(0.8, 1.0, size=[2])
+    left, upper = np.random.uniform(0.0, 1-crop_w), np.random.uniform(0.0, 1-crop_h)
+    right, lower = left+crop_w, upper+crop_h
+    crop_box = np.array([left, upper, right, lower]) * np.array([raw_w, raw_h, raw_w, raw_h])
+    crop_box = crop_box.astype(np.int32)
+    PIL_img = PIL_img.crop(crop_box)
+    return PIL_img
+
+
 # 图片增强，淡化局部
 def add_local_dim(np_img):
     # 随机淡化某个区域
     pos_h = np.random.randint(0, np_img.shape[0])
     pos_w = np.random.randint(0, np_img.shape[1])
-    radius = random.randint(5, 10)
+    radius = random.randint(18, 20)
     for i in range(-radius, radius):
         for j in range(-radius, radius):
             if i**2 + j**2 <= radius**2 and 0 <= pos_h+i < np_img.shape[0] and 0 <= pos_w+j < np_img.shape[1]:
@@ -90,7 +133,7 @@ def add_dilate(np_img):
 
 # 图片增强，所有相关函数打包其中
 def image_augmentation(np_img, noise=True, dilate=True, erode=True):
-    if random.random() < 0.6:
+    if random.random() < 1.:
         np_img = add_local_dim(np_img)
 
     if noise and random.random() < 0.6:
@@ -318,19 +361,24 @@ def load_external_image_bigger(img_path, white_background=True, reverse_color=Tr
 if __name__ == "__main__":
 
     # PIL_img = generate_bigger_image_by_font(chinese_char="龥", font_file="../chinese_fonts/mingliu.ttc")
-    PIL_img = load_external_image_bigger("E:/pycharm_project/ziku_images/張即之/行.gif", white_background=True, reverse_color=True)
+    PIL_img = load_external_image_bigger("E:/pycharm_project/ziku_images/張即之/動.gif", white_background=True, reverse_color=True)
     # PIL_img = rotate_PIL_image(PIL_img, rotate_angle=30)
+    # PIL_img = get_standard_image(PIL_img, obj_size=max(PIL_img.height, PIL_img.width), reverse_color=True)
+    # PIL_img = random_crop(PIL_img)
     # np_img = np.array(PIL_img, dtype=np.uint8)
     # print(np_img.tolist())
-    # np_img = image_Augmentation(np_img)
-    # np_img = adjust_img_and_put_into_Background(np_img, obj_size=(196,196))
+    # np_img = image_augmentation(np_img)
+    # np_img = adjust_img_and_put_into_background(np_img, background_size=196)
 
-    # # 图片去噪
+    # 高斯噪声和椒盐噪声
+    # np_img = gauss_noise(np_img)
+    # np_img = salt_and_pepper_noise(np_img)
+    
+    # 图片去噪
     # np_img[np_img < 10] = 0
     # np_img[np_img > 240] = 255
     # PIL_img = Image.fromarray(np_img)
-
-    # PIL_img = get_standard_image(PIL_img, obj_size=max(PIL_img.height, PIL_img.width), reverse_color=True)
+    
     PIL_img = get_augmented_image(PIL_img, obj_size=max(PIL_img.height, PIL_img.width), rotation=False, noise=False, dilate=False,erode=False, reverse_color=True)
     PIL_img.show()
 

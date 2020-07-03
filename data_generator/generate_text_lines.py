@@ -75,7 +75,7 @@ def generate_one_text_line_imgs(obj_num=100, text_type="horizontal", text_shape=
             save_path = os.path.join(text_line_imgs_dir, img_name)
             PIL_text.save(save_path, format="jpeg")
             fw.write(img_name + "\t" + json.dumps(image_tags) + "\n")
-
+            
             if i % 50 == 0:
                 print("Process bar: %.2f%%" % (i*100/obj_num))
                 sys.stdout.flush()
@@ -154,7 +154,8 @@ def generate_two_text_line_imgs(obj_num=100, text_type="horizontal", text_shape=
                 _shape = (random.randint(54, 108), random.randint(108, 960)) # 双行文本数据无需太长
             if text_shape is None and text_type == "v":
                 _shape = (random.randint(108, 960), random.randint(54, 108)) # 双行文本数据无需太长
-
+            
+            # 训练双行文本的切分，既需要生成双行数据，也需要生成单行数据（不切分的情况）
             PIL_text, split_pos_list = create_two_text_line(_shape, text_type=text_type)
             image_tags = {"split_pos_list": split_pos_list}
             
@@ -194,6 +195,7 @@ def generate_two_text_line_tfrecords(obj_num=100, text_type="horizontal", text_s
         if text_shape is None and text_type == "v":
             _shape = (random.randint(108, 960), random.randint(54, 108))  # 双行文本数据无需太长
 
+        # 训练双行文本的切分，既需要生成双行数据，也需要生成单行数据（不切分的情况）
         PIL_text, split_pos_list = create_two_text_line(_shape, text_type=text_type)
         
         bytes_image = PIL_text.tobytes()  # 将图片转化为原生bytes
@@ -433,7 +435,7 @@ def generate_one_row_chars(x, y1, y2, length, np_background, char_spacing):
     while length >= row_height:
         chinese_char, bounding_box, x_tail = \
             generate_char_img_into_unclosed_box(np_background, x1=x, y1=y1, x2=None, y2=y2, char_spacing=char_spacing)
-
+        
         char_and_box_list.append((chinese_char, bounding_box))
         added_length = x_tail - x
         length -= added_length
@@ -458,7 +460,7 @@ def generate_one_row_chars(x, y1, y2, length, np_background, char_spacing):
 def generate_two_rows_chars(x, y1, y2, length, np_background, char_spacing):
     row_height = y2 - y1 + 1
     mid_y = y1 + round(row_height / 2)
-
+    
     x_1, text1_bbox, _, _ = generate_one_row_chars(x, y1, mid_y, length, np_background, char_spacing)
     x_2, text2_bbox, _, _ = generate_one_row_chars(x, mid_y+1, y2, length, np_background, char_spacing)
 
@@ -479,7 +481,7 @@ def generate_one_col_chars(x1, x2, y, length, np_background, char_spacing):
     while length >= col_width:
         chinese_char, bounding_box, y_tail = \
             generate_char_img_into_unclosed_box(np_background, x1=x1, y1=y, x2=x2, y2=None, char_spacing=char_spacing)
-
+        
         char_and_box_list.append((chinese_char, bounding_box))
         added_length = y_tail - y
         length -= added_length
@@ -656,9 +658,15 @@ def generate_char_img_into_unclosed_box(np_background, x1, y1, x2=None, y2=None,
         np_background[box_y1:box_y2 + 1, box_x1:box_x2 + 1] = np_char_img
     except ValueError as e:
         # print('Exception:', e)
-        # print("The size of char_img is larger than the length of (y1, x1) to background_img's edge.")
-        # print("Now, try another char_img ...")
-        return generate_char_img_into_unclosed_box(np_background, x1, y1, x2, y2, char_spacing)
+        # print("The size of char_img is larger than the length of (y1, x1) to edge. Now, resize char_img ...")
+        if x2 is None:
+            box_x2 = np_background.shape[1] - 1
+            box_w = box_x2 - box_x1 + 1
+        else:
+            box_y2 = np_background.shape[0] - 1
+            box_h = box_y2 - box_y1 + 1
+        np_char_img = resize_img_by_opencv(np_char_img, obj_size=(box_w, box_h))
+        np_background[box_y1:box_y2 + 1, box_x1:box_x2 + 1] = np_char_img
 
     # 包围汉字的最小box作为bounding-box
     # bounding_box = (box_x1, box_y1, box_x2, box_y2)
@@ -666,8 +674,8 @@ def generate_char_img_into_unclosed_box(np_background, x1, y1, x2=None, y2=None,
     # 随机选定汉字图片的bounding-box
     bbox_x1 = random.randint(x1, box_x1)
     bbox_y1 = random.randint(y1, box_y1)
-    bbox_x2 = random.randint(box_x2, box_x2+char_spacing_w)
-    bbox_y2 = random.randint(box_y2, box_y2+char_spacing_h)
+    bbox_x2 = min(random.randint(box_x2, box_x2+char_spacing_w), np_background.shape[1]-1)
+    bbox_y2 = min(random.randint(box_y2, box_y2+char_spacing_h), np_background.shape[0]-1)
     bounding_box =(bbox_x1, bbox_y1, bbox_x2, bbox_y2)
     
     char_box_tail = box_x2+1 if x2 is None else box_y2+1

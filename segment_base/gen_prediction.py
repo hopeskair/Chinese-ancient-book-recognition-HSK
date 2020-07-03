@@ -69,7 +69,8 @@ class ExtractSplitPosition(layers.Layer):
         super(ExtractSplitPosition, self).__init__(**kwargs)
     
     def call(self, inputs, **kwargs):
-        pred_cls_logit, pred_delta, img_width = inputs
+        pred_cls_logit, pred_delta, img_width, real_images_width = inputs
+        batch_size = tf.shape(pred_cls_logit)[0]
         feat_width = img_width // self.feat_stride
 
         interval_center = (tf.range(0., feat_width) + 0.5) * self.feat_stride
@@ -79,19 +80,33 @@ class ExtractSplitPosition(layers.Layer):
         pred_split_positions = pred_delta * self.feat_stride + interval_center
         pred_scores = K.sigmoid(pred_cls_logit)
 
-        img_width = tf.cast(img_width, tf.float32)
+        max_width = real_images_width[:, tf.newaxis, tf.newaxis] - 1.
         pred_split_positions = tf.where(pred_split_positions < 0., 0., pred_split_positions)
-        pred_split_positions = tf.where(pred_split_positions > img_width - 1., img_width - 1., pred_split_positions)
+        pred_split_positions = tf.where(pred_split_positions > max_width, max_width, pred_split_positions)
 
         # 非极大抑制
         options = {"score_thresh": self.cls_score_thresh,
                    "distance_thresh": self.distance_thresh,
                    "max_outputs": self.nms_max_outputs}
-        outputs = tf.map_fn(fn=lambda x: nms(*x, **options),
-                            elems=[pred_split_positions, pred_scores],
-                            dtype=[tf.float32, tf.float32])
+        nms_split_positions, nms_scores = tf.map_fn(fn=lambda x: nms(*x, **options),
+                                                    elems=[pred_split_positions, pred_scores],
+                                                    dtype=[tf.float32, tf.float32])
         
-        return outputs
+        # In order to compute accuracy
+        nms_center = tf.reduce_mean(nms_split_positions[..., :2], axis=2)
+        x_interval_num = tf.floor(nms_center / self.feat_stride)
+        
+        nms_indices = tf.where(nms_split_positions[..., 2] == 1.)
+        x_interval_num = tf.gather_nd(x_interval_num, nms_indices)
+
+        batch_indices = nms_indices[:, 0]
+        x_interval_num = tf.cast(x_interval_num, tf.int64)
+        target_indices = tf.stack([batch_indices, x_interval_num], axis=1)
+        pre_nms_cls = tf.ones_like(target_indices[:, 0], dtype=tf.float32)
+        
+        nms_cls_ids = tf.scatter_nd(indices=target_indices, updates=pre_nms_cls, shape=[batch_size, feat_width])  # 0, 1
+        
+        return nms_split_positions, nms_scores, nms_cls_ids
 
 
 if __name__ == '__main__':

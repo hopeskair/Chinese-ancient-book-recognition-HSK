@@ -46,12 +46,12 @@ def train(data_file, src_type, epochs, init_epochs=0, model_struc="densenet_gru"
     
     # 开始训练
     train_model.fit_generator(generator=training_generator,
-                              steps_per_epoch=200,
+                              steps_per_epoch=500,
                               epochs=epochs + init_epochs,
                               initial_epoch=init_epochs,
                               verbose=1,
                               validation_data=validation_generator,
-                              validation_steps=10,
+                              validation_steps=20,
                               callbacks=get_callbacks(model_struc),
                               max_queue_size=100)
     
@@ -62,7 +62,7 @@ def train(data_file, src_type, epochs, init_epochs=0, model_struc="densenet_gru"
 def main():
     train(data_file=CHAR_TFRECORDS_PATHS_FILE,
           src_type="tfrecords",
-          epochs=10,
+          epochs=50*10,
           init_epochs=0,
           model_struc="densenet_gru",
           weights_path="")

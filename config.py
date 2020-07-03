@@ -167,6 +167,8 @@ CRNN_LOGS_DIR = os.path.join(CURR_DIR, "recog_with_crnn", "logs")
 
 
 # ************************** Segment model *******************************
+SEGMENT_BASE_ROOT_DIR = os.path.join(CURR_DIR, "segment_base")
+
 SEGMENT_BOOK_PAGE_ROOT_DIR = os.path.join(CURR_DIR, "segment_book_page")
 SEGMENT_BOOK_PAGE_CKPT_DIR = os.path.join(CURR_DIR, "segment_book_page", "ckpt")
 SEGMENT_BOOK_PAGE_LOGS_DIR = os.path.join(CURR_DIR, "segment_book_page", "logs")
@@ -238,15 +240,15 @@ SEGMENT_ID_TO_TASK = {
 SEGMENT_BATCH_SIZE = {
     "book_page": 4,
     "mix_line": 12,
-    "double_line": 1,   # Batch size can only be 1 since the input is arbitrary height.
+    "double_line": 12,
     "text_line": 48
 }
 
-SEGMENT_FIXED_SHAPE = {
-    "book_page": (560, None),
-    "mix_line": (80, None),
-    "double_line": (None, 80),  # Arbitrary height
-    "text_line": (48, None)
+SEGMENT_FIXED_HEIGHT = {
+    "book_page": 560,
+    "mix_line": 80,
+    "double_line": 192, # 等宽缩放
+    "text_line": 48
 }
 
 SEGMENT_MAX_INCLINATION = {
@@ -273,14 +275,14 @@ SEGMENT_CLS_SCORE_THRESH = {
 SEGMENT_DISTANCE_THRESH = {
     "book_page": 28,
     "mix_line": 24,
-    "double_line": 20,
+    "double_line": 16,
     "text_line": 0.6    # distance threshold ratio
 }
 
 SEGMENT_NMS_MAX_OUTPUTS = {
     "book_page": 20,
     "mix_line": 10,
-    "double_line": 3,
+    "double_line": 5,
     "text_line": 80
 }
 

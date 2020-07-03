@@ -8,7 +8,7 @@ from PIL import Image, ImageFont, ImageDraw
 
 from .utils import remove_pad_tf
 
-from config import CTPN_ROOT_DIR
+from config import SEGMENT_BASE_ROOT_DIR
 
 
 def draw_text_boxes(np_img, text_boxes):
@@ -54,7 +54,7 @@ def draw_split_lines(np_img, split_positions, scores=None):
         PIL_img = PIL_img.convert(mode="RGB")
     
     draw = ImageDraw.Draw(PIL_img)
-    font_path = os.path.join(CTPN_ROOT_DIR, "font", "FiraMono-Medium.otf")
+    font_path = os.path.join(SEGMENT_BASE_ROOT_DIR, "font", "FiraMono-Medium.otf")
     font_object = ImageFont.truetype(font=font_path, size=16)  # 字体, or size=int(3e-2 * h)
     
     for i, (x1, x2) in enumerate(split_positions):
@@ -64,14 +64,12 @@ def draw_split_lines(np_img, split_positions, scores=None):
         if scores is not None:
             score = scores[i]  # 得分
             label = '{:.2f}'.format(score)  # 标签
-            label_size = draw.textsize(label, font_object)  # 标签文字
-            
             text_origin = np.array([x1 + 1, y1 + 1])
+            # label_size = draw.textsize(label, font_object)  # 标签文字
             # draw.rectangle([tuple(text_origin), tuple(text_origin+label_size)], fill=self.colors[c])    # 文字背景
             draw.text(text_origin, label, fill="green", font=font_object)  # 文案
-    
+
     np_img = np.array(PIL_img, dtype=np.uint8)
-    
     return np_img
 
 

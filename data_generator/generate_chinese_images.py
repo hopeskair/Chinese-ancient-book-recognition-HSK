@@ -33,6 +33,8 @@ def generate_all_chinese_images_bigger(font_file, image_size=int(CHAR_IMG_SIZE*1
     else:
         _chinese_chars = "".join(all_chinese_list)
     
+    # _chinese_chars = "安愛蒼碧冒葡囊蒡夏啻坌"
+    
     for chinese_char in _chinese_chars:
         try:  # 生成字体图片
             bigger_PIL_img = generate_bigger_image_by_font(chinese_char, font_file, image_size)
@@ -139,7 +141,7 @@ def generate_tfrecords(obj_size=CHAR_IMG_SIZE, num_imgs_per_font=NUM_IMAGES_PER_
     # 若直接把同一字体同一个字的多张图片连续放到同一个tfrecords里，那么训练batch的多样性不好
     writers_list = \
         [tf.io.TFRecordWriter(os.path.join(CHAR_TFRECORDS_DIR, "chinese_imgs_%d_from_font.tfrecords" % i))
-         for i in range(20)]
+         for i in range(100)]
     
     print("Begin to generate images ...")
     chinese_char_num = len(CHAR2ID_DICT)
@@ -300,7 +302,7 @@ def convert_tfrecords(obj_size=CHAR_IMG_SIZE, num_imgs_per_font=NUM_IMAGES_PER_F
     # 若直接把同一字体同一个字图片增强出的多张图片连续放到同一个tfrecords里，那么每一个训练batch的多样性就不好
     writers_list = \
         [tf.io.TFRecordWriter(os.path.join(CHAR_TFRECORDS_DIR, "chinese_imgs_%d_from_img.tfrecords" % i))
-         for i in range(20)]
+         for i in range(100)]
 
     print("Begin to convert images ...")
     total_num = sum(font_images_num_list)
@@ -391,7 +393,7 @@ def display_tfrecords(tfrecords_file):
 
 
 if __name__ == '__main__':
-    generate_chinese_images_to_check(obj_size=48, augmentation=False)
+    generate_chinese_images_to_check(obj_size=200, augmentation=False)
     # generate_chinese_images(num_imgs_per_font=3)
     # generate_tfrecords(num_imgs_per_font=NUM_IMAGES_PER_FONT)
     #

@@ -145,8 +145,8 @@ def adjust_img_to_fixed_shape(PIL_img=None, np_img=None, random_crop=False, fixe
     if random_crop:
         raw_w, raw_h = PIL_img.size
         crop_w, crop_h = np.random.uniform(0.88, 1.0, size=[2])
-        left, upper = np.random.uniform(0.0, 0.12, size=[2])
-        right, lower = 1 - (1 - crop_w - left),  1 - (1 - crop_h - upper)
+        left, upper = np.random.uniform(0.0, 1 - crop_w), np.random.uniform(0.0, 1 - crop_h)
+        right, lower = left + crop_w, upper + crop_h
         crop_box = np.array([left, upper, right, lower]) * np.array([raw_w, raw_h, raw_w, raw_h])
         crop_box = crop_box.astype(np.int32)
         PIL_img = PIL_img.crop(crop_box)

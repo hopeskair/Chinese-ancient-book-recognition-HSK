@@ -181,106 +181,106 @@ def extract_split_info():
                 split_seq = re.findall(pattern2, split_info)
                 split_dict[char] = split_seq
     
-    # # list all char and compo by their first sub-compo
-    # temp_dict = {}
-    # temp_set = set()
-    # for i in range(UNICODE_HEAD, UNICODE_TAIL + 1):
-    #     chinese_char = chr(i)
-    #     # label = str(i - UNICODE_HEAD)
-    #     # u_code = hex(i).upper()[2:]
-    #     assert chinese_char in split_dict and chinese_char in strokes_dict
-    #     char_compo = get_all_compo(chinese_char, split_dict)
-    #     temp_set.update(char_compo)
-    #     temp_set.add(chinese_char)
-    # _all = set()
-    # for char in temp_set:
-    #     if char in CHINESE_STRUCTURES: continue
-    #     char_compo = split_dict.get(char, "-")
-    #     if char_compo[0] in "⿱⿳":
-    #         _all.add(char)
-    #         c = char_compo[1] if char_compo[1] not in CHINESE_STRUCTURES else char_compo[2]
-    #         # for c in char_compo:
-    #         if c not in temp_dict:
-    #             temp_dict[c] = {char}
-    #         else:
-    #             temp_dict[c].add(char)
-    # print(len(_all), _all)
-    # all_compo = list(temp_dict.keys())
-    # all_compo.sort(key=lambda c: strokes_dict.get(c, -1))
-    # for c in all_compo:
-    #     chars = list(temp_dict[c])
-    #     chars.sort(key=lambda c: (len(c), c))
-    #     print(c+":", "".join(chars))
-    
-    # correct char split_info
-    with open(CHINESE_SPLIT_CORRECT_FILE, "r", encoding="utf8") as fr:
-        for line in fr:
-            line = line.strip()
-            if line.startswith("#"): continue
-            line = line.split()
-            if len(line) == 1:
-                chars = re.findall(pattern2, line[0])
-                for char in chars:
-                    split_dict[char] = [char]
-            if len(line) == 4:
-                char, old_split_info, _, new_split_info = line
-                new_split_seq = re.findall(pattern2, new_split_info)
-                split_dict[char] = new_split_seq
-    
-    # convert split_dict format
-    for char, split_seq in split_dict.items():
-        if len(split_seq) > 1:
-            init_length = len(split_seq)
-            split_seq, last_pos = parse_split_seq(split_seq)
-            assert last_pos == init_length
-            split_dict[char] = split_seq
-    
-    # save components sequence
-    simple_chars, nested_chars, enclosed_chars, upper_lower_chars = "", "", "", ""
-    lr_compo_set = set()
-    lr_compo_dict = dict()
-    with open(CHINESE_SPLIT_FILE, "w", encoding="utf8") as fw:
-        for i in range(UNICODE_HEAD, UNICODE_TAIL+1):
-            chinese_char = chr(i)
-            label = str(i - UNICODE_HEAD)
-            u_code = hex(i).upper()[2:]
-            assert chinese_char in split_dict and chinese_char in strokes_dict
-            strokes_num = str(strokes_dict[chinese_char])
-            
-            split_seq = split_dict[chinese_char]
-            split_json = None
-            if len(split_seq) == 1:
-                simple_chars += chinese_char
-                # split_json = json.dumps([chinese_char])
-                split_json = chinese_char
+    # list all char and compo by their first sub-compo
+    temp_dict = {}
+    temp_set = set()
+    for i in range(UNICODE_HEAD, UNICODE_TAIL + 1):
+        chinese_char = chr(i)
+        # label = str(i - UNICODE_HEAD)
+        # u_code = hex(i).upper()[2:]
+        assert chinese_char in split_dict and chinese_char in strokes_dict
+        char_compo = get_all_compo(chinese_char, split_dict)
+        # temp_set.update(char_compo)
+        temp_set.add(chinese_char)
+    _all = set()
+    for char in temp_set:
+        if char in CHINESE_STRUCTURES: continue
+        char_compo = split_dict.get(char, "-")
+        if char_compo[0] in "⿰⿲":
+            _all.add(char)
+            c = char_compo[1] if char_compo[1] not in CHINESE_STRUCTURES else char_compo[2]
+            # for c in char_compo:
+            if c not in temp_dict:
+                temp_dict[c] = {char}
             else:
-                base_struc = split_seq[0]
-                assert base_struc in CHINESE_STRUCTURES
-                
-                if base_struc == "⿻":
-                    nested_chars += chinese_char
-                    split_json = chinese_char
-                elif base_struc in "⿰⿲⿺":
-                    base_struc = "⿰"
-                    sub_components = get_sub_compo_by_struc(chinese_char, split_dict, base_struc=base_struc)
-                    # split_json = json.dumps([base_struc] + sub_components)
-                    split_json = ",".join([base_struc] + sub_components)
-                    lr_compo_set.update(sub_components)
-                    for c in set(sub_components):
-                        if c not in lr_compo_dict:
-                            lr_compo_dict[c] = chinese_char
-                        else:
-                            lr_compo_dict[c] += chinese_char
-                elif base_struc in "⿱⿳⿸":
-                    upper_lower_chars += chinese_char
-                    split_json = chinese_char
-                else:
-                    # enclosed structure
-                    enclosed_chars += chinese_char
-                    split_json = chinese_char
-            
-            assert split_json is not None
-            fw.write(label + "\t" + u_code + "\t" + chinese_char + "\t" + strokes_num + "\t" + split_json + "\n")
+                temp_dict[c].add(char)
+    print(len(_all), _all)
+    all_compo = list(temp_dict.keys())
+    all_compo.sort(key=lambda c: strokes_dict.get(c, -1))
+    for c in all_compo:
+        chars = list(temp_dict[c])
+        chars.sort(key=lambda c: (len(c), c))
+        print(c+":", "".join(chars))
+    
+    # # correct char split_info
+    # with open(CHINESE_SPLIT_CORRECT_FILE, "r", encoding="utf8") as fr:
+    #     for line in fr:
+    #         line = line.strip()
+    #         if line.startswith("#"): continue
+    #         line = line.split()
+    #         if len(line) == 1:
+    #             chars = re.findall(pattern2, line[0])
+    #             for char in chars:
+    #                 split_dict[char] = [char]
+    #         if len(line) == 4:
+    #             char, old_split_info, _, new_split_info = line
+    #             new_split_seq = re.findall(pattern2, new_split_info)
+    #             split_dict[char] = new_split_seq
+    #
+    # # convert split_dict format
+    # for char, split_seq in split_dict.items():
+    #     if len(split_seq) > 1:
+    #         init_length = len(split_seq)
+    #         split_seq, last_pos = parse_split_seq(split_seq)
+    #         assert last_pos == init_length
+    #         split_dict[char] = split_seq
+    #
+    # # save components sequence
+    # simple_chars, nested_chars, enclosed_chars, upper_lower_chars = "", "", "", ""
+    # lr_compo_set = set()
+    # lr_compo_dict = dict()
+    # with open(CHINESE_SPLIT_FILE, "w", encoding="utf8") as fw:
+    #     for i in range(UNICODE_HEAD, UNICODE_TAIL+1):
+    #         chinese_char = chr(i)
+    #         label = str(i - UNICODE_HEAD)
+    #         u_code = hex(i).upper()[2:]
+    #         assert chinese_char in split_dict and chinese_char in strokes_dict
+    #         strokes_num = str(strokes_dict[chinese_char])
+    #
+    #         split_seq = split_dict[chinese_char]
+    #         split_json = None
+    #         if len(split_seq) == 1:
+    #             simple_chars += chinese_char
+    #             # split_json = json.dumps([chinese_char])
+    #             split_json = chinese_char
+    #         else:
+    #             base_struc = split_seq[0]
+    #             assert base_struc in CHINESE_STRUCTURES
+    #
+    #             if base_struc == "⿻":
+    #                 nested_chars += chinese_char
+    #                 split_json = chinese_char
+    #             elif base_struc in "⿰⿲⿺":
+    #                 base_struc = "⿰"
+    #                 sub_components = get_sub_compo_by_struc(chinese_char, split_dict, base_struc=base_struc)
+    #                 # split_json = json.dumps([base_struc] + sub_components)
+    #                 split_json = ",".join([base_struc] + sub_components)
+    #                 lr_compo_set.update(sub_components)
+    #                 for c in set(sub_components):
+    #                     if c not in lr_compo_dict:
+    #                         lr_compo_dict[c] = chinese_char
+    #                     else:
+    #                         lr_compo_dict[c] += chinese_char
+    #             elif base_struc in "⿱⿳⿸":
+    #                 upper_lower_chars += chinese_char
+    #                 split_json = chinese_char
+    #             else:
+    #                 # enclosed structure
+    #                 enclosed_chars += chinese_char
+    #                 split_json = chinese_char
+    #
+    #         assert split_json is not None
+    #         fw.write(label + "\t" + u_code + "\t" + chinese_char + "\t" + strokes_num + "\t" + split_json + "\n")
         
         # print(len(simple_chars), to_sort(simple_chars, strokes_dict))
         # print(len(nested_chars), to_sort(nested_chars, strokes_dict))
