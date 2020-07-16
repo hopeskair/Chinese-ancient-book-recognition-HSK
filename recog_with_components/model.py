@@ -51,26 +51,35 @@ def Bidirectional_RNN(inputs, rnn_units=64, rnn_type="gru"):
     return outputs
 
 
-def data_branch_tf(inputs, stage="test"):
-    features, components_seq, real_char_struc, pred_char_struc = inputs
+def data_branch_tf(inputs):
+    features, char_struc = inputs
     
-    char_struc_used = real_char_struc if stage == "train" else pred_char_struc
-    sc_indices = tf.where(char_struc_used == 0)[:, 0]
-    lr_indices = tf.where(char_struc_used == 1)[:, 0]
+    sc_indices = tf.where(char_struc == 0)[:, 0]
+    lr_indices = tf.where(char_struc == 1)[:, 0]
     # ul_indices = tf.where(char_struc_used == 2)[:, 0]
     
     sc_features = tf.gather(features, indices=sc_indices)
     lr_features = tf.gather(features, indices=lr_indices)
     # ul_features = tf.gather(features, indices=ul_indices)
     
+    return sc_features, lr_features
+
+
+def label_branch_tf(inputs):
+    components_seq, char_struc = inputs
+    
+    sc_indices = tf.where(char_struc == 0)[:, 0]
+    lr_indices = tf.where(char_struc == 1)[:, 0]
+    # ul_indices = tf.where(char_struc_used == 2)[:, 0]
+    
     sc_labels = tf.gather(components_seq, indices=sc_indices)[:, 0]
     lr_compo_seq = tf.gather(components_seq, indices=lr_indices)
     # ul_compo_seq = tf.gather(components_seq, indices=ul_indices)
     
-    return sc_features, lr_features, sc_labels, lr_compo_seq
+    return sc_labels, lr_compo_seq
 
 
-def build_model(stage="test", img_size=64, model_struc="densenet_gru"):
+def build_model(stage="predict", img_size=64, model_struc="densenet_gru"):
     
     batch_images = layers.Input(shape=[img_size, img_size, 3], name='batch_images')
     char_struc = layers.Input(shape=[], dtype=tf.int32, name='char_struc')
@@ -96,9 +105,11 @@ def build_model(stage="test", img_size=64, model_struc="densenet_gru"):
     _, pred_char_struc = tf.math.top_k(pred_struc_logits, k=1, name="pred_char_struc")
     pred_char_struc = pred_char_struc[:, 0]
     
-    sc_features, lr_features, sc_labels, lr_compo_seq = \
-        layers.Lambda(data_branch_tf, arguments={"stage": stage}, name="data_branch")(
-            [features, components_seq, char_struc, pred_char_struc])
+    # teacher-forcing
+    char_struc_used = char_struc if stage == "train" else pred_char_struc
+    sc_features, lr_features = layers.Lambda(data_branch_tf, name="data_branch")([features, char_struc_used])
+    
+    sc_labels, lr_compo_seq = layers.Lambda(label_branch_tf, name="label_branch")([components_seq, char_struc])
     
     # ***************** 简单汉字预测 ******************
     x_sc = layers.Conv2D(16, 3, padding="same", name="sc_conv")(sc_features)

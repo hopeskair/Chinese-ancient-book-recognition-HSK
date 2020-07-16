@@ -57,8 +57,8 @@ def char_predict(images=None, img_paths=None, recog_model=None, model_struc="den
         weights_path = model_weights_path(weights, model_struc)
 
         # 加载模型
-        pred_model = work_net(stage="predict", img_size=CHAR_IMG_SIZE, model_struc=model_struc)
-        pred_model.load_weights(weights_path, by_name=True)
+        recog_model = work_net(stage="predict", img_size=CHAR_IMG_SIZE, model_struc=model_struc)
+        recog_model.load_weights(weights_path, by_name=True)
         print("\nLoad model weights from %s\n" % weights_path)
         # pred_model.summary()
     
@@ -68,12 +68,12 @@ def char_predict(images=None, img_paths=None, recog_model=None, model_struc="den
     for i in range(0, len(np_img_list), batch_size):
         _images_list = []
         for np_img in np_img_list[i:i + batch_size]:
-            PIL_img = adjust_img_to_fixed_shape(np_img=np_img, img_shape=(CHAR_IMG_SIZE, CHAR_IMG_SIZE))
+            PIL_img = adjust_img_to_fixed_shape(np_img=np_img, fixed_shape=(CHAR_IMG_SIZE, CHAR_IMG_SIZE))
             np_img = np.array(PIL_img, dtype=np.uint8)
             _images_list.append(np_img)
         batch_images = np.array(_images_list, dtype=np.float32)
         
-        pred_char_struc, pred_results = pred_model.predict(x=batch_images)  # 模型预测
+        pred_char_struc, pred_results = recog_model.predict(x=batch_images)  # 模型预测
 
         topk = min(5, np.shape(pred_results)[1])
         for j in range(len(batch_images)):
@@ -99,5 +99,15 @@ def char_predict(images=None, img_paths=None, recog_model=None, model_struc="den
     return np_img_list, img_name_list, pred_topk_chars_list
         
 
+def main():
+    char_predict(images=None,
+                 img_paths="_chars",
+                 recog_model=None,
+                 model_struc="densenet_gru",
+                 weights=121,
+                 to_print=True)
+
 if __name__ == '__main__':
+    
+    
     print("Done !")

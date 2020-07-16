@@ -8,7 +8,7 @@ import random
 import cv2
 import numpy as np
 import tensorflow as tf
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from config import ONE_TEXT_LINE_IMGS_H, ONE_TEXT_LINE_TAGS_FILE_H
 from config import ONE_TEXT_LINE_IMGS_V, ONE_TEXT_LINE_TAGS_FILE_V
@@ -64,9 +64,9 @@ def generate_one_text_line_imgs(obj_num=100, text_type="horizontal", text_shape=
     with open(text_line_tags_file, "w", encoding="utf-8") as fw:
         for i in range(obj_num):
             if text_shape is None and text_type == "h":
-                _shape = (random.randint(36, 64), random.randint(540, 960))
+                _shape = (random.randint(38, 72), random.randint(540, 1280))
             if text_shape is None and text_type == "v":
-                _shape = (random.randint(540, 960), random.randint(36, 64))
+                _shape = (random.randint(540, 1280), random.randint(38, 72))
 
             PIL_text, char_and_box_list, split_pos_list = create_one_text_line(_shape, text_type=text_type)
             image_tags = {"char_and_box_list": char_and_box_list, "split_pos_list": split_pos_list}
@@ -81,7 +81,7 @@ def generate_one_text_line_imgs(obj_num=100, text_type="horizontal", text_shape=
                 sys.stdout.flush()
 
 
-def generate_one_text_line_tfrecords(obj_num=100, text_type="horizontal", text_shape=None):
+def generate_one_text_line_tfrecords(obj_num=100, text_type="horizontal", init_num=0, text_shape=None, edges=False):
     text_type = check_text_type(text_type)
     
     if text_type == "h":
@@ -95,7 +95,7 @@ def generate_one_text_line_tfrecords(obj_num=100, text_type="horizontal", text_s
     # 而不必将生成的图片先保存到磁盘，再从磁盘读取出来保存到tfrecords文件，这样效率太低
     writers_list = \
         [tf.io.TFRecordWriter(os.path.join(text_line_tfrecords_dir, "text_lines_%d.tfrecords" % i))
-         for i in range(20)]
+         for i in range(init_num, init_num+20)]
     
     # 保存生成的文本图片
     _shape = text_shape
@@ -103,11 +103,11 @@ def generate_one_text_line_tfrecords(obj_num=100, text_type="horizontal", text_s
         writer = random.choice(writers_list)
 
         if text_shape is None and text_type == "h":
-            _shape = (random.randint(36, 64), random.randint(540, 960))
+            _shape = (random.randint(38, 72), random.randint(540, 1280))
         if text_shape is None and text_type == "v":
-            _shape = (random.randint(540, 960), random.randint(36, 64))
+            _shape = (random.randint(540, 1280), random.randint(38, 72))
         
-        PIL_text, char_and_box_list, split_pos_list = create_one_text_line(_shape, text_type=text_type)
+        PIL_text, char_and_box_list, split_pos_list = create_one_text_line(_shape, text_type=text_type, edges=edges)
         
         bytes_image = PIL_text.tobytes()  # 将图片转化为原生bytes
         bytes_chars = "".join([chinese_char for chinese_char, gt_box in char_and_box_list]).encode("utf-8")
@@ -151,9 +151,9 @@ def generate_two_text_line_imgs(obj_num=100, text_type="horizontal", text_shape=
     with open(text_line_tags_file, "w", encoding="utf-8") as fw:
         for i in range(obj_num):
             if text_shape is None and text_type == "h":
-                _shape = (random.randint(54, 108), random.randint(108, 960)) # 双行文本数据无需太长
+                _shape = (random.randint(64, 108), random.randint(108, 1024)) # 双行文本数据无需太长
             if text_shape is None and text_type == "v":
-                _shape = (random.randint(108, 960), random.randint(54, 108)) # 双行文本数据无需太长
+                _shape = (random.randint(108, 1024), random.randint(64, 108)) # 双行文本数据无需太长
             
             # 训练双行文本的切分，既需要生成双行数据，也需要生成单行数据（不切分的情况）
             PIL_text, split_pos_list = create_two_text_line(_shape, text_type=text_type)
@@ -169,7 +169,7 @@ def generate_two_text_line_imgs(obj_num=100, text_type="horizontal", text_shape=
                 sys.stdout.flush()
 
 
-def generate_two_text_line_tfrecords(obj_num=100, text_type="horizontal", text_shape=None):
+def generate_two_text_line_tfrecords(obj_num=100, text_type="horizontal", init_num=0, text_shape=None, edges=False):
     text_type = check_text_type(text_type)
     
     if text_type == "h":
@@ -183,7 +183,7 @@ def generate_two_text_line_tfrecords(obj_num=100, text_type="horizontal", text_s
     # 而不必将生成的图片先保存到磁盘，再从磁盘读取出来保存到tfrecords文件，这样效率太低
     writers_list = \
         [tf.io.TFRecordWriter(os.path.join(text_line_tfrecords_dir, "text_lines_%d.tfrecords" % i))
-         for i in range(20)]
+         for i in range(init_num, init_num+20)]
     
     # 保存生成的文本图片
     _shape = text_shape
@@ -191,12 +191,12 @@ def generate_two_text_line_tfrecords(obj_num=100, text_type="horizontal", text_s
         writer = random.choice(writers_list)
 
         if text_shape is None and text_type == "h":
-            _shape = (random.randint(54, 108), random.randint(108, 960))  # 双行文本数据无需太长
+            _shape = (random.randint(64, 108), random.randint(108, 1024))  # 双行文本数据无需太长
         if text_shape is None and text_type == "v":
-            _shape = (random.randint(108, 960), random.randint(54, 108))  # 双行文本数据无需太长
+            _shape = (random.randint(108, 1024), random.randint(64, 108))  # 双行文本数据无需太长
 
         # 训练双行文本的切分，既需要生成双行数据，也需要生成单行数据（不切分的情况）
-        PIL_text, split_pos_list = create_two_text_line(_shape, text_type=text_type)
+        PIL_text, split_pos_list = create_two_text_line(_shape, text_type=text_type, edges=edges)
         
         bytes_image = PIL_text.tobytes()  # 将图片转化为原生bytes
         split_positions = np.array(split_pos_list, dtype=np.int32).tobytes()
@@ -251,7 +251,7 @@ def generate_mix_text_line_imgs(obj_num=100, text_type="horizontal", text_shape=
                 sys.stdout.flush()
 
 
-def generate_mix_text_line_tfrecords(obj_num=100, text_type="horizontal", text_shape=None):
+def generate_mix_text_line_tfrecords(obj_num=100, text_type="horizontal", init_num=0, text_shape=None, edges=False):
     text_type = check_text_type(text_type)
     
     if text_type == "h":
@@ -265,7 +265,7 @@ def generate_mix_text_line_tfrecords(obj_num=100, text_type="horizontal", text_s
     # 而不必将生成的图片先保存到磁盘，再从磁盘读取出来保存到tfrecords文件，这样效率太低
     writers_list = \
         [tf.io.TFRecordWriter(os.path.join(text_line_tfrecords_dir, "text_lines_%d.tfrecords" % i))
-         for i in range(20)]
+         for i in range(init_num, init_num+20)]
     
     # 保存生成的文本图片
     _shape = text_shape
@@ -277,7 +277,7 @@ def generate_mix_text_line_tfrecords(obj_num=100, text_type="horizontal", text_s
         if text_shape is None and text_type == "v":
             _shape = (random.randint(720, 1280), random.randint(54, 108))
 
-        PIL_text, _, split_pos_list = create_mix_text_line(_shape, text_type=text_type)
+        PIL_text, _, split_pos_list = create_mix_text_line(_shape, text_type=text_type, edges=edges)
         
         bytes_image = PIL_text.tobytes()  # 将图片转化为原生bytes
         split_positions = np.array(split_pos_list, dtype=np.int32).tobytes()
@@ -301,13 +301,66 @@ def generate_mix_text_line_tfrecords(obj_num=100, text_type="horizontal", text_s
     return
 
 
-def create_one_text_line(shape=(36, 720), text_type="horizontal"):
+def draw_edges_around_text(np_img, text_type, line_type="single"):
+    img_h, img_w = np_img.shape[:2]
+    
+    if random.random() < 0.8:
+        margin_w = round(random.uniform(0., 0.05) * img_w)
+        margin_h = round(random.uniform(0., 0.05) * img_h)
+        margin_line_thickness = random.randint(2, 5)
+        
+        PIL_img = Image.fromarray(np_img)
+        draw = ImageDraw.Draw(PIL_img)
+        
+        if random.random() < 0.5:
+            if line_type in ("single", "mix"):
+                if text_type == "h":
+                    # 横向排列, 点的坐标格式为(x, y)，不是(y, x)
+                    draw.line([margin_w, 0, margin_w, img_h-1], fill="white", width=margin_line_thickness)
+                    draw.line([img_w - 1 - margin_w, 0, img_w - 1 - margin_w, img_h - 1], fill="white", width=margin_line_thickness)
+                    margin_w, margin_h = margin_w + round(margin_line_thickness/2), 0
+                else:
+                    # 纵向排列
+                    draw.line([0, margin_h, img_w-1, margin_h], fill="white", width=margin_line_thickness)
+                    draw.line([0, img_h - 1 - margin_h, img_w - 1, img_h - 1 - margin_h], fill="white", width=margin_line_thickness)
+                    margin_w, margin_h = 0, margin_h + round(margin_line_thickness/2)
+            else:
+                # line_type == "double"
+                if text_type == "h":
+                    # 横向排列
+                    draw.line([0, margin_h, img_w - 1, margin_h], fill="white", width=margin_line_thickness)
+                    draw.line([0, img_h - 1 - margin_h, img_w - 1, img_h - 1 - margin_h], fill="white", width=margin_line_thickness)
+                    margin_w, margin_h = 0, margin_h + round(margin_line_thickness / 2)
+                else:
+                    # 纵向排列
+                    draw.line([margin_w, 0, margin_w, img_h - 1], fill="white", width=margin_line_thickness)
+                    draw.line([img_w - 1 - margin_w, 0, img_w - 1 - margin_w, img_h - 1], fill="white", width=margin_line_thickness)
+                    margin_w, margin_h = margin_w + round(margin_line_thickness / 2), 0
+        elif random.random() < 0.5:
+            draw.rectangle([(margin_w, margin_h), (img_w - 1 - margin_w, img_h - 1 - margin_h)],
+                           fill=None, outline="white", width=margin_line_thickness)
+            margin_w, margin_h = margin_w + round(margin_line_thickness/2), margin_h + round(margin_line_thickness/2)
+        
+        np_img = np.array(PIL_img, dtype=np.uint8)
+        return np_img, margin_w, margin_h
+    
+    else:
+        return np_img, 0, 0
+    
+    
+def create_one_text_line(shape=(64, 960), text_type="horizontal", edges=False):
     text_type = check_text_type(text_type)
     check_text_line_shape(shape, text_type)
     text_h, text_w = shape
     
     # 生成黑色背景
     np_text = np.zeros(shape=(text_h, text_w), dtype=np.uint8)
+    
+    # 随机确定是否画边框线
+    if edges:
+        np_text, margin_w, margin_h = draw_edges_around_text(np_text, text_type, line_type="single")
+    else:
+        margin_w, margin_h = 0, 0
 
     # 横向排列
     if text_type == "h":
@@ -315,9 +368,10 @@ def create_one_text_line(shape=(36, 720), text_type="horizontal"):
         char_spacing = (random.uniform(0.0, 0.05), random.uniform(0.0, 0.2))  # (高方向, 宽方向)
 
         # 生成一行汉字
-        y1, y2 = 0, text_h -1
-        x = 0
-        _, _, char_and_box_list, split_pos = generate_one_row_chars(x, y1, y2, text_w, np_text, char_spacing)
+        y1, y2 = margin_h, text_h - 1 - margin_h
+        x = margin_w
+        length = text_w - 2 * margin_w
+        _, _, char_and_box_list, split_pos = generate_one_row_chars(x, y1, y2, length, np_text, char_spacing)
 
     # 纵向排列
     else:
@@ -325,9 +379,10 @@ def create_one_text_line(shape=(36, 720), text_type="horizontal"):
         char_spacing = (random.uniform(0.0, 0.2), random.uniform(0.0, 0.05))  # (高方向, 宽方向)
 
         # 生成一列汉字
-        x1, x2 = 0, text_w - 1
-        y = 0
-        _, _, char_and_box_list, split_pos = generate_one_col_chars(x1, x2, y, text_h, np_text, char_spacing)
+        x1, x2 = margin_w, text_w - 1 - margin_w
+        y = margin_h
+        length = text_h - 2 * margin_h
+        _, _, char_and_box_list, split_pos = generate_one_col_chars(x1, x2, y, length, np_text, char_spacing)
     
     np_text = reverse_image_color(np_img=np_text)
     PIL_text = Image.fromarray(np_text)
@@ -339,7 +394,7 @@ def create_one_text_line(shape=(36, 720), text_type="horizontal"):
     return PIL_text, char_and_box_list, split_pos
 
 
-def create_two_text_line(shape=(64, 1280), text_type="horizontal"):
+def create_two_text_line(shape=(64, 1280), text_type="horizontal", edges=False):
     """训练双行文本的切分，既需要生成双行数据，也需要生成单行数据（不切分的情况）"""
     
     text_type = check_text_type(text_type)
@@ -348,20 +403,27 @@ def create_two_text_line(shape=(64, 1280), text_type="horizontal"):
     
     # 生成黑色背景
     np_text = np.zeros(shape=(text_h, text_w), dtype=np.uint8)
+
+    # 随机确定是否画边框线
+    if edges:
+        np_text, margin_w, margin_h = draw_edges_around_text(np_text, text_type, line_type="double")
+    else:
+        margin_w, margin_h = 0, 0
     
     # 横向排列
     if text_type == "h":
         # 随机决定字符间距占行距的比例
         char_spacing = (random.uniform(0.0, 0.05), random.uniform(0.0, 0.2))  # (高方向, 宽方向)
         
-        y1, y2 = 0, text_h - 1
-        x = 0
+        y1, y2 = margin_h, text_h - 1 - margin_h
+        x = margin_w
+        length = text_w - 2 * margin_w
         if random.random() < 0.7:
             # 生成两行汉字
-            _, text1_bbox, text2_bbox, split_pos = generate_two_rows_chars(x, y1, y2, text_w, np_text, char_spacing)
+            _, text1_bbox, text2_bbox, split_pos = generate_two_rows_chars(x, y1, y2, length, np_text, char_spacing)
         else:
             # 生成单行汉字
-            _, text_bbox, _, _ = generate_one_row_chars(x, y1, y2, text_w, np_text, char_spacing)
+            _, text_bbox, _, _ = generate_one_row_chars(x, y1, y2, length, np_text, char_spacing)
             split_pos = [text_bbox[1], text_bbox[3]]
     
     # 纵向排列
@@ -369,14 +431,15 @@ def create_two_text_line(shape=(64, 1280), text_type="horizontal"):
         # 随机决定字符间距占列距的比例
         char_spacing = (random.uniform(0.0, 0.2), random.uniform(0.0, 0.05))  # (高方向, 宽方向)
         
-        x1, x2 = 0, text_w - 1
-        y = 0
+        x1, x2 = margin_w, text_w - 1 - margin_w
+        y = margin_h
+        length = text_h - 2 * margin_h
         if random.random() < 0.7:
             # 生成两列汉字
-            _, text1_bbox, text2_bbox, split_pos = generate_two_cols_chars(x1, x2, y, text_h, np_text, char_spacing)
+            _, text1_bbox, text2_bbox, split_pos = generate_two_cols_chars(x1, x2, y, length, np_text, char_spacing)
         else:
             # 生成单列汉字
-            _, text_bbox, _, _ = generate_one_col_chars(x1, x2, y, text_h, np_text, char_spacing)
+            _, text_bbox, _, _ = generate_one_col_chars(x1, x2, y, length, np_text, char_spacing)
             split_pos = [text_bbox[0], text_bbox[2]]
     
     np_text = reverse_image_color(np_img=np_text)
@@ -388,13 +451,19 @@ def create_two_text_line(shape=(64, 1280), text_type="horizontal"):
     return PIL_text, split_pos
 
 
-def create_mix_text_line(shape=(64, 1280), text_type="horizontal"):
+def create_mix_text_line(shape=(64, 1280), text_type="horizontal", edges=False):
     text_type = check_text_type(text_type)
     check_text_line_shape(shape, text_type)
     text_h, text_w = shape
     
     # 生成黑色背景
     np_text = np.zeros(shape=(text_h, text_w), dtype=np.uint8)
+
+    # 随机确定是否画边框线
+    if edges:
+        np_text, margin_w, margin_h = draw_edges_around_text(np_text, text_type, line_type="mix")
+    else:
+        margin_w, margin_h = 0, 0
     
     # 横向排列
     if text_type == "h":
@@ -402,9 +471,10 @@ def create_mix_text_line(shape=(64, 1280), text_type="horizontal"):
         char_spacing = (random.uniform(0.0, 0.05), random.uniform(0.0, 0.2))  # (高方向, 宽方向)
         
         # 生成单双行
-        y1, y2 = 0, text_h - 1
-        x = 0
-        _, text_bbox_list, split_pos = generate_mix_rows_chars(x, y1, y2, text_w, np_text, char_spacing)
+        y1, y2 = margin_h, text_h - 1 - margin_h
+        x = margin_w
+        length = text_w - 2 * margin_w
+        _, text_bbox_list, split_pos = generate_mix_rows_chars(x, y1, y2, length, np_text, char_spacing)
     
     # 纵向排列
     else:
@@ -412,9 +482,10 @@ def create_mix_text_line(shape=(64, 1280), text_type="horizontal"):
         char_spacing = (random.uniform(0.0, 0.2), random.uniform(0.0, 0.05))  # (高方向, 宽方向)
         
         # 生成单双列
-        x1, x2 = 0, text_w - 1
-        y = 0
-        _, text_bbox_list, split_pos = generate_mix_cols_chars(x1, x2, y, text_h, np_text, char_spacing)
+        x1, x2 = margin_w, text_w - 1 - margin_w
+        y = margin_h
+        length = text_h - 2 * margin_h
+        _, text_bbox_list, split_pos = generate_mix_cols_chars(x1, x2, y, length, np_text, char_spacing)
     
     np_text = reverse_image_color(np_img=np_text)
     PIL_text = Image.fromarray(np_text)

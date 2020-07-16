@@ -59,7 +59,7 @@ def check_tags(tags_file, segment_task, text_type):
 
 def main():
     # convert_annotation(img_sources=[(TWO_TEXT_LINE_TAGS_FILE_H, TWO_TEXT_LINE_IMGS_H)], dest_file=SEGMENT_DOUBLE_LINE_TAGS_FILE_H)
-    convert_annotation(img_sources=[(TWO_TEXT_LINE_TAGS_FILE_V, TWO_TEXT_LINE_IMGS_V)], dest_file=SEGMENT_DOUBLE_LINE_TAGS_FILE_V)
+    # convert_annotation(img_sources=[(TWO_TEXT_LINE_TAGS_FILE_V, TWO_TEXT_LINE_IMGS_V)], dest_file=SEGMENT_DOUBLE_LINE_TAGS_FILE_V)
     # convert_annotation(tfrecords_dir=TWO_TEXT_LINE_TFRECORDS_H, dest_file=SEGMENT_DOUBLE_LINE_TFRECORDS_H)
     convert_annotation(tfrecords_dir=TWO_TEXT_LINE_TFRECORDS_V, dest_file=SEGMENT_DOUBLE_LINE_TFRECORDS_V)
     

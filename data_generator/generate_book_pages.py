@@ -20,7 +20,7 @@ from config import BOOK_PAGE_IMGS_V, BOOK_PAGE_TAGS_FILE_V
 from config import BOOK_PAGE_TFRECORDS_H, BOOK_PAGE_TFRECORDS_V
 
 
-def generate_book_page_imgs(obj_num=10, text_type="horizontal", page_shape=None):
+def generate_book_page_imgs(obj_num=10, text_type="horizontal", init_num=0, page_shape=None):
     text_type = check_text_type(text_type)
     
     if text_type == "h":
@@ -32,7 +32,7 @@ def generate_book_page_imgs(obj_num=10, text_type="horizontal", page_shape=None)
     
     _shape = page_shape
     with open(book_page_tags_file, "w", encoding="utf-8") as fw:
-        for i in range(obj_num):
+        for i in range(init_num, init_num + obj_num):
             if page_shape is None and text_type == "h":
                 _shape = (random.randint(480, 720), random.randint(640, 960))
             if page_shape is None and text_type == "v":
@@ -47,7 +47,7 @@ def generate_book_page_imgs(obj_num=10, text_type="horizontal", page_shape=None)
             fw.write(img_name + "\t" + json.dumps(image_tags) + "\n")
             
             if i % 50 == 0:
-                print("Process bar: %.2f%%" % (i*100/obj_num))
+                print("Process bar: %.2f%%" % ((i-init_num)*100/obj_num))
                 sys.stdout.flush()
 
 
@@ -111,7 +111,7 @@ def create_book_page(shape=(960, 540), text_type="horizontal"):
     
     # 随机确定是否画边框线及行线
     draw = None
-    if random.random() < 0.6:
+    if random.random() < 0.7:
         PIL_page = Image.fromarray(np_page)
         draw = ImageDraw.Draw(PIL_page)
     
@@ -172,7 +172,10 @@ def create_book_page(shape=(960, 540), text_type="horizontal"):
     else:  # 纵向排列
         
         # 随机决定文本的列数
-        cols_num = random.randint(6, 10)
+        # cols_num = random.randint(6, 10)
+        # cols_num = random.randint(18, 23)
+        # cols_num = random.randint(14, 19)
+        cols_num = random.randint(16, 20)
         col_w = (page_width - 2 * margin_w) / cols_num
 
         # x-coordinate划分列
@@ -275,11 +278,11 @@ def display_tfrecords(tfrecords_file):
         
 
 if __name__ == '__main__':
-    generate_book_page_imgs(obj_num=100, text_type="horizontal", page_shape=(416, 416))
-    generate_book_page_imgs(obj_num=100, text_type="vertical", page_shape=(416, 416))
-    generate_book_page_tfrecords(obj_num=100, text_type="horizontal")
-    generate_book_page_tfrecords(obj_num=8000, text_type="vertical")
+    # generate_book_page_imgs(obj_num=100, text_type="horizontal", page_shape=(416, 416))
+    # generate_book_page_imgs(obj_num=50, text_type="vertical")
+    # generate_book_page_tfrecords(obj_num=100, text_type="horizontal")
+    # generate_book_page_tfrecords(obj_num=10000, text_type="vertical", init_num=0)
     
-    display_tfrecords(os.path.join(BOOK_PAGE_TFRECORDS_V, "book_pages_0.tfrecords"))
+    # display_tfrecords(os.path.join(BOOK_PAGE_TFRECORDS_V, "book_pages_0.tfrecords"))
     
     print("Done !")

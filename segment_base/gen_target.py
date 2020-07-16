@@ -17,6 +17,19 @@ class SegmentTarget(layers.Layer):
         self.cls_score_thresh = cls_score_thresh
         self.segment_task = segment_task
         super(SegmentTarget, self).__init__(**kwargs)
+
+    def get_config(self):
+        config = super().get_config().copy()
+        config.update({
+            'feat_stride': self.feat_stride,
+            'label_smoothing': self.label_smoothing,
+            'pos_weight': self.pos_weight,
+            'neg_weight': self.neg_weight,
+            'pad_weight': self.pad_weight,
+            'cls_score_thresh': self.cls_score_thresh,
+            'segment_task': self.segment_task
+        })
+        return config
     
     def call(self, inputs, **kwargs):
         split_line_pos, feat_width, real_features_width, pred_cls_logit = inputs  # 要求划分位置是有序的，从小到大; padding value -1
@@ -55,40 +68,43 @@ class SegmentTarget(layers.Layer):
         
         split_line_delta = (interval_split_line - interval_center) / self.feat_stride
         
-        num_positive = tf.shape(target_indices)[0]
-        if self.segment_task in ("text_line",):
-            # 抽样，使正负样本均衡（主要针对text_line切分任务）
-            num_negative = num_positive * tf.cast(self.pos_weight / self.neg_weight, tf.int32)
-        else:
-            # 对于double_line, mix_line切分任务来说, 不需要抽样（或者说全部作为样本）
-            num_negative = batch_size * feat_width - num_positive # * 3
-        
-        if self.segment_task in ("text_line",):
+        # 筛选负类
+        if self.segment_task in ("text_line", "mix_line"):
             nearby_maximum = tf.nn.max_pool1d(interval_mask[..., tf.newaxis], ksize=3, strides=1, padding="SAME")   # zero padding
             nearby_maximum = tf.reshape(nearby_maximum, shape=tf.shape(nearby_maximum)[:2])
-            # _neg_indices = tf.where(nearby_maximum == 0.)  # pure negative indices, sample method 2
+            # neg_indices = tf.where(nearby_maximum == 0.)    # sample method 2, pure neg indices
             
-            pred_scores = K.sigmoid(pred_cls_logit) # 抽样那些预测出错的负类，针对性学习, sample method 3
+            pred_scores = K.sigmoid(pred_cls_logit)  # sample method 3, 抽样那些预测出错的负类，针对性学习
             neg_indices_wrong = tf.where(tf.logical_and(nearby_maximum == 0., pred_scores >= self.cls_score_thresh))
             neg_indices_right = tf.where(tf.logical_and(nearby_maximum == 0., pred_scores < self.cls_score_thresh))
-            _neg_indices = tf.concat([neg_indices_wrong, tf.random.shuffle(neg_indices_right)], axis=0)
+            neg_indices = tf.concat([neg_indices_wrong, tf.random.shuffle(neg_indices_right)], axis=0)
         else:
-            _neg_indices = tf.where(interval_mask == 0.) # sample method 1
+            neg_indices = tf.where(interval_mask == 0.) # sample method 1
+            neg_indices = tf.random.shuffle(neg_indices)
         
-        neg_indices = _neg_indices[:num_negative]
-        neg_flag = tf.ones_like(neg_indices[:, 0], dtype=tf.float32)
-        neg_flag = tf.scatter_nd(indices=neg_indices, updates=neg_flag, shape=[batch_size, feat_width]) # 抽样结果
+        num_positive = tf.shape(target_indices)[0]
+        num_negative = tf.shape(neg_indices)[0]
+        
+        # 抽样，使正负样本均衡
+        num_samples = tf.minimum(num_positive, num_negative)
+        pos_indices = target_indices[:num_samples]
+        neg_indices = neg_indices[:num_samples]
+        
+        ones = tf.ones_like(neg_indices[:, 0], dtype=tf.float32)
+        twos = tf.ones_like(pos_indices[:, 0], dtype=tf.float32) + 1.
+        flag = tf.scatter_nd(indices=neg_indices, updates=ones, shape=[batch_size, feat_width]) # 0, 1
+        flag = tf.tensor_scatter_nd_add(tensor=flag, indices=pos_indices, updates=twos)         # 0, 1, 2
         
         # 不同类别占损失的权重
         feat_region = tf.expand_dims(tf.range(0, feat_width, dtype=tf.int32), axis=0)
         real_features_width = tf.expand_dims(tf.cast(real_features_width, tf.int32), axis=1)
         inside_weights = tf.where(feat_region <= real_features_width, self.neg_weight, self.pad_weight)
-        inside_weights = tf.where(neg_flag == 1., inside_weights, 0.)
-        inside_weights = tf.where(interval_mask == 1., self.pos_weight, inside_weights)
+        inside_weights = tf.where(flag == 1., inside_weights, 0.)
+        inside_weights = tf.where(flag == 2., self.pos_weight, inside_weights)
         
         # summary, 用作度量的必须是浮点类型
         num_pos = tf.cast(num_positive, tf.float32)
-        num_neg = tf.cast(tf.shape(_neg_indices)[0], tf.float32)
+        num_neg = tf.cast(num_negative, tf.float32)
         
         return interval_cls_goals, split_line_delta, interval_mask, inside_weights, num_pos, num_neg
         

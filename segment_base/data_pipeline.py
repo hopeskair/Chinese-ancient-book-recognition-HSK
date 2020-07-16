@@ -3,8 +3,9 @@
 
 import os
 import json
+import random
 from PIL import Image
-from skimage import color, transform
+from skimage import color, transform, util
 import numpy as np
 import tensorflow as tf
 
@@ -16,9 +17,9 @@ from config import SEGMENT_TASK_ID, SEGMENT_ID_TO_TASK
 
 
 def image_preprocess_tf(images, stage="train"):
-    convert_imgs = tf.image.per_image_standardization(images)
     if stage == "train":
-        convert_imgs = tf.cond(tf.random.uniform([]) < 0.5, lambda: convert_imgs, lambda: -convert_imgs)
+        images = tf.cond(tf.random.uniform([]) < 0.5, lambda: images, lambda: 255 - images)
+    convert_imgs = tf.image.per_image_standardization(images)
     return convert_imgs
 
 
@@ -186,10 +187,11 @@ def adjust_img_to_fixed_height(np_img, split_positions=None, fixed_h=560, segmen
     text_type = text_type[0].lower()
     if (segment_task, text_type) in (("book_page", "h"), ("double_line", "h"), ("text_line", "v"), ("mix_line", "v")):
         np_img, split_positions = rotate_90_degrees(np_img, split_positions)
+        # Image.fromarray(np_img).save("temp"+str(random.randint(0, 100000))+".jpg", format="jpeg")
     
     # to rgb
     if len(np_img.shape) == 2 or np_img.shape[-1] != 3:
-        np_img = color.grey2rgb(np_img)
+        np_img = color.gray2rgb(np_img)
     
     # scale image to fixed shape
     raw_h, raw_w = np_img.shape[:2]
@@ -199,8 +201,8 @@ def adjust_img_to_fixed_height(np_img, split_positions=None, fixed_h=560, segmen
     else:
         fixed_w = raw_w       # double_line情况, 等宽缩放, 在打包batch时, 将调整为16的倍数
         scale_ratio = 1.0
-    np_img = transform.resize(np_img, output_shape=(fixed_h, fixed_w))  # float32
-    np_img = np_img.astype(np.uint8)
+    np_img = transform.resize(np_img, output_shape=(fixed_h, fixed_w))  # float32 [0, 1.]
+    np_img = util.img_as_ubyte(np_img)
     
     if split_positions is not None:
         split_positions = split_positions * scale_ratio
@@ -414,6 +416,7 @@ def data_generator(data_file, src_type="images", segment_task="book_page", text_
     train_lines = lines[:num_train]
     validation_lines = lines[num_train:]
     np.random.shuffle(train_lines)
+    np.random.shuffle(validation_lines)
     
     if src_type == "images":
         training_generator = data_generator_with_images(train_lines, batch_size, fixed_h, feat_stride, segment_task, text_type)
@@ -428,13 +431,13 @@ def data_generator(data_file, src_type="images", segment_task="book_page", text_
     
 
 if __name__ == "__main__":
-    from config import SEGMENT_BOOK_PAGE_TFRECORDS_H
+    from config import SEGMENT_BOOK_PAGE_TFRECORDS_H, SEGMENT_BOOK_PAGE_TAGS_FILE_V
     
     training_generator, validation_generator = \
-        data_generator(data_file=SEGMENT_BOOK_PAGE_TFRECORDS_H,
-                       src_type="tfrecords",
+        data_generator(data_file=SEGMENT_BOOK_PAGE_TAGS_FILE_V,
+                       src_type="images",
                        segment_task="book_page",
-                       text_type="horizontal")
+                       text_type="vertical")
     
     for inputs_dict in training_generator:
         print(inputs_dict)

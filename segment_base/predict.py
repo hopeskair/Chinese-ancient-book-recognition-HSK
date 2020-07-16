@@ -14,6 +14,7 @@ from segment_base.data_pipeline import adjust_img_to_fixed_height, pack_a_batch
 from segment_base.data_pipeline import rotate_90_degrees, restore_original_angle
 from segment_base.utils import remove_pad_np
 from segment_base.utils import get_segment_task_path, get_segment_task_params
+from segment_base.book_page_processing import book_page_pre_processing
 
 from util import check_or_makedirs
 
@@ -24,12 +25,12 @@ def convert_images(images):
     elif isinstance(images, Image.Image):
         np_img_list = [np.array(images),]
     elif isinstance(images, list):
-        if isinstance(images[0], np.ndarray):
+        if len(images) > 0 and isinstance(images[0], np.ndarray):
             np_img_list = images
-        elif isinstance(images[0], Image.Image):
+        elif len(images) > 0 and isinstance(images[0], Image.Image):
             np_img_list = [np.array(PIL_img) for PIL_img in images]
         else:
-            ValueError("The element type of images list is wrong!")
+            np_img_list = []
     else:
         ValueError("The type of images is wrong!")
     return np_img_list
@@ -103,6 +104,10 @@ def segment_predict(images=None,
         assert img_paths is not None
         np_img_list, img_name_list = load_images(img_paths)
     
+    # book page pre-processing
+    if segment_task == "book_page":
+        np_img_list = book_page_pre_processing(np_img_list)
+    
     # model
     if segment_model is None:
         K.set_learning_phase(False)
@@ -143,6 +148,8 @@ def segment_predict(images=None,
         for i in range(len(np_img_list)):
             if (segment_task, text_type) in (("book_page", "h"), ("double_line", "h"), ("text_line", "v"), ("mix_line", "v")):
                 np_img, split_positions = rotate_90_degrees(np_img_list[i], split_positions_list[i])
+            else:
+                np_img, split_positions = np_img_list[i], split_positions_list[i]
             
             np_img = visualize.draw_split_lines(np_img, split_positions, scores_list[i])  # 可视化
 

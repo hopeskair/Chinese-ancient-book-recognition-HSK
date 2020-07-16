@@ -4,3 +4,4 @@ pillow
 shapely
 scikit-image
 bs4
+lxml

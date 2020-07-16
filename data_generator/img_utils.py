@@ -108,7 +108,7 @@ def add_local_dim(np_img):
     # 随机淡化某个区域
     pos_h = np.random.randint(0, np_img.shape[0])
     pos_w = np.random.randint(0, np_img.shape[1])
-    radius = random.randint(18, 20)
+    radius = random.randint(12, 16)
     for i in range(-radius, radius):
         for j in range(-radius, radius):
             if i**2 + j**2 <= radius**2 and 0 <= pos_h+i < np_img.shape[0] and 0 <= pos_w+j < np_img.shape[1]:

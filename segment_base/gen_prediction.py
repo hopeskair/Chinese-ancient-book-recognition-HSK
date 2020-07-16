@@ -53,8 +53,14 @@ def nms(split_positions, scores, score_thresh=0.7, distance_thresh=16, max_outpu
     nms_scores = nms_scores.stack()
     nms_positions = nms_positions.stack()
     
-    nms_scores = pad_to_fixed_size_tf(nms_scores[:, tf.newaxis], max_outputs)
+    # sort
+    line_cent = tf.reduce_mean(nms_positions, axis=1)
+    _indices = tf.argsort(line_cent, axis=-1, direction='ASCENDING')
+    nms_positions = tf.gather(nms_positions, _indices)
+    nms_scores = tf.gather(nms_scores, _indices)
+
     nms_positions = pad_to_fixed_size_tf(nms_positions, max_outputs)
+    nms_scores = pad_to_fixed_size_tf(nms_scores[:, tf.newaxis], max_outputs)
     
     return [nms_positions, nms_scores]
 
@@ -67,6 +73,16 @@ class ExtractSplitPosition(layers.Layer):
         self.distance_thresh = distance_thresh
         self.nms_max_outputs = nms_max_outputs
         super(ExtractSplitPosition, self).__init__(**kwargs)
+        
+    def get_config(self):
+        config = super().get_config().copy()
+        config.update({
+            'feat_stride': self.feat_stride,
+            'cls_score_thresh': self.cls_score_thresh,
+            'distance_thresh': self.distance_thresh,
+            'nms_max_outputs': self.nms_max_outputs,
+        })
+        return config
     
     def call(self, inputs, **kwargs):
         pred_cls_logit, pred_delta, img_width, real_images_width = inputs

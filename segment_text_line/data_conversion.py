@@ -58,13 +58,13 @@ def check_tags(tags_file, segment_task, text_type):
 
 
 def main():
-    convert_annotation(img_sources=[(ONE_TEXT_LINE_TAGS_FILE_H, ONE_TEXT_LINE_IMGS_H)], dest_file=SEGMENT_TEXT_LINE_TAGS_FILE_H)
-    convert_annotation(img_sources=[(ONE_TEXT_LINE_TAGS_FILE_V, ONE_TEXT_LINE_IMGS_V)], dest_file=SEGMENT_TEXT_LINE_TAGS_FILE_V)
-    convert_annotation(tfrecords_dir=ONE_TEXT_LINE_TFRECORDS_H, dest_file=SEGMENT_TEXT_LINE_TFRECORDS_H)
+    # convert_annotation(img_sources=[(ONE_TEXT_LINE_TAGS_FILE_H, ONE_TEXT_LINE_IMGS_H)], dest_file=SEGMENT_TEXT_LINE_TAGS_FILE_H)
+    # convert_annotation(img_sources=[(ONE_TEXT_LINE_TAGS_FILE_V, ONE_TEXT_LINE_IMGS_V)], dest_file=SEGMENT_TEXT_LINE_TAGS_FILE_V)
+    # convert_annotation(tfrecords_dir=ONE_TEXT_LINE_TFRECORDS_H, dest_file=SEGMENT_TEXT_LINE_TFRECORDS_H)
     convert_annotation(tfrecords_dir=ONE_TEXT_LINE_TFRECORDS_V, dest_file=SEGMENT_TEXT_LINE_TFRECORDS_V)
     
     # check_tags(tags_file=SEGMENT_TEXT_LINE_TAGS_FILE_H, segment_task="text_line", text_type="horizontal")
-    check_tags(tags_file=SEGMENT_TEXT_LINE_TAGS_FILE_V, segment_task="text_line", text_type="vertical")
+    # check_tags(tags_file=SEGMENT_TEXT_LINE_TAGS_FILE_V, segment_task="text_line", text_type="vertical")
 
 
 if __name__ == '__main__':

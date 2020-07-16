@@ -51,6 +51,14 @@ class GeneratePrediction(layers.Layer):
         self.topk = topk
         self.stage = stage
         super(GeneratePrediction, self).__init__(**kwargs)
+
+    def get_config(self):
+        config = super().get_config().copy()
+        config.update({
+            'topk': self.topk,
+            'stage': self.stage,
+        })
+        return config
     
     def call(self, inputs, **kwargs):
         pred_char_struc, pred_sc_logits, pred_lr_compo_logits = inputs
@@ -66,10 +74,10 @@ class GeneratePrediction(layers.Layer):
         
         # 输出形式
         if self.stage != "train":
-            batch_size, seq_len = tf.shape(pred_char_struc)[0], tf.shape(pred_lr_compo_seq)[1]
+            batch_size, seq_len = tf.shape(pred_char_struc)[0], tf.shape(pred_lr_compo_seq)[2]
             
-            pred_sc_batch_indices = tf.where(pred_char_struc == 0)
-            pred_lr_batch_indices = tf.where(pred_char_struc == 1)
+            pred_sc_batch_indices = tf.cast(tf.where(pred_char_struc == 0), tf.int32)
+            pred_lr_batch_indices = tf.cast(tf.where(pred_char_struc == 1), tf.int32)
             # pred_ul_batch_indices = tf.where(pred_char_struc == 2)
             
             sc_num = tf.shape(pred_sc_batch_indices)[0]

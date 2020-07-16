@@ -59,7 +59,7 @@ def draw_split_lines(np_img, split_positions, scores=None):
     
     for i, (x1, x2) in enumerate(split_positions):
         y1, y2 = 0, h-1
-        draw.line([x1, y1, x2, y2], fill="green", width=2)  # 画框
+        draw.line([x1, y1, x2, y2], fill="red", width=2)  # 画框
         
         if scores is not None:
             score = scores[i]  # 得分
@@ -67,7 +67,7 @@ def draw_split_lines(np_img, split_positions, scores=None):
             text_origin = np.array([x1 + 1, y1 + 1])
             # label_size = draw.textsize(label, font_object)  # 标签文字
             # draw.rectangle([tuple(text_origin), tuple(text_origin+label_size)], fill=self.colors[c])    # 文字背景
-            draw.text(text_origin, label, fill="green", font=font_object)  # 文案
+            draw.text(text_origin, label, fill="red", font=font_object)  # 文案
 
     np_img = np.array(PIL_img, dtype=np.uint8)
     return np_img

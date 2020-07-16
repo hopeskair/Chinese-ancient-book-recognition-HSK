@@ -12,7 +12,7 @@ def main():
           text_type="vertical",
           segment_task="mix_line",
           epochs=100,
-          init_epochs=13,
+          init_epochs=59,
           model_struc="densenet_gru",
           weights_path="")
 

@@ -29,10 +29,10 @@ if __name__ == '__main__':
     # convert_annotation_ctpn(img_sources=[(BOOK_PAGE_TAGS_FILE_V, BOOK_PAGE_IMGS_V)])
     # convert_annotation_ctpn(tfrecords_dir=BOOK_PAGE_TFRECORDS_V)
     
-    # segment_book_page_main()
+    segment_book_page_main()
     # segment_mix_line_main()
     # segment_text_line_main()
-    segment_double_line_main()
+    # segment_double_line_main()
     
     # extract_paths_main()
     

@@ -44,7 +44,7 @@ MIX_TEXT_LINE_TFRECORDS_V = os.path.join(DATA_DIR, "mix_text_lines", "tfrecords_
 BOOK_PAGE_IMGS_H = os.path.join(DATA_DIR, "book_pages", "imgs_horizontal")
 BOOK_PAGE_IMGS_V = os.path.join(DATA_DIR, "book_pages", "imgs_vertical")
 BOOK_PAGE_TAGS_FILE_H = os.path.join(DATA_DIR, "book_pages", "book_pages_tags_horizontal.txt")
-BOOK_PAGE_TAGS_FILE_V = os.path.join(DATA_DIR, "book_pages", "book_pages_tags_vertical.txt")
+BOOK_PAGE_TAGS_FILE_V = os.path.join(DATA_DIR, "book_pages", "book_pages_tags_vertical_3.txt")
 BOOK_PAGE_TFRECORDS_H = os.path.join(DATA_DIR, "book_pages", "tfrecords_horizontal")
 BOOK_PAGE_TFRECORDS_V = os.path.join(DATA_DIR, "book_pages", "tfrecords_vertical")
 
@@ -238,17 +238,17 @@ SEGMENT_ID_TO_TASK = {
 }
 
 SEGMENT_BATCH_SIZE = {
-    "book_page": 4,
+    "book_page": 1,
     "mix_line": 12,
     "double_line": 12,
-    "text_line": 48
+    "text_line": 36
 }
 
 SEGMENT_FIXED_HEIGHT = {
-    "book_page": 560,
-    "mix_line": 80,
-    "double_line": 192, # 等宽缩放
-    "text_line": 48
+    "book_page": 1024,
+    "mix_line": 96,
+    "double_line": 400, # 等宽缩放
+    "text_line": 64
 }
 
 SEGMENT_MAX_INCLINATION = {
@@ -274,13 +274,13 @@ SEGMENT_CLS_SCORE_THRESH = {
 
 SEGMENT_DISTANCE_THRESH = {
     "book_page": 28,
-    "mix_line": 24,
+    "mix_line": 20,
     "double_line": 16,
     "text_line": 0.6    # distance threshold ratio
 }
 
 SEGMENT_NMS_MAX_OUTPUTS = {
-    "book_page": 20,
+    "book_page": 50,
     "mix_line": 10,
     "double_line": 5,
     "text_line": 80
@@ -292,7 +292,7 @@ SEGMENT_LOSS_WEIGHTS = {
 }
 
 SEGMENT_LINE_WEIGHTS = {
-    "split_line": 10.,
+    "split_line": 1.,  # book_page:1, mix_line:1, double_line:1, text_line:1
     "other_space": 1.,
     "pad_space": 1.
 }
